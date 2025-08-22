@@ -15,7 +15,13 @@ from .views import (
     PaymentViewSet,
     ContactInquiryViewSet,
     ClaimViewSet,
+    ClaimDocumentViewSet,
     DashboardStatsViewSet,
+    NotificationViewSet,
+    QuotationViewSet,
+    # Profile views
+    UserProfileView,
+    CustomerProfileView,
     # API views only (no HTML templates)
     search_customers,
     search_vehicles,
@@ -40,7 +46,10 @@ router.register(r'policies', InsurancePolicyViewSet, basename='policy')
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'contact-inquiries', ContactInquiryViewSet, basename='contact-inquiry')
 router.register(r'claims', ClaimViewSet, basename='claim')
+router.register(r'claim-documents', ClaimDocumentViewSet, basename='claim-document')
 router.register(r'dashboard-stats', DashboardStatsViewSet, basename='dashboard-stats')
+router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'quotations', QuotationViewSet, basename='quotation')
 
 urlpatterns = [
     # Auth (JWT)
@@ -61,6 +70,10 @@ urlpatterns = [
     path('api/analytics/overview/', analytics_overview, name='analytics_overview'),
     path('api/generate-quote/', generate_quote, name='generate_quote'),
     path('api/generate-report/', generate_report, name='generate_report'),
+
+    # Profile
+    path('api/profile/user/', UserProfileView.as_view(), name='user_profile'),
+    path('api/profile/customer/', CustomerProfileView.as_view(), name='customer_profile'),
 
     # AJAX/management APIs
     path('api/claims/<int:claim_id>/status/', update_claim_status, name='update_claim_status'),

@@ -5,22 +5,51 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { getAuthToken } from "@/lib/api";
 
 const Login = () => {
   const [email, setEmail] = useState("vishal@gmail.com");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple validation
-    if (email && password) {
+    try {
+      await login.mutateAsync({ email, password });
+      toast({ title: "Login Successful", description: "Welcome back!" });
+      // Fetch permissions to route user to the appropriate dashboard
+      try {
+        const token = getAuthToken();
+        const res = await fetch("/api/user-permissions/", {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (res.ok) {
+          const perms = await res.json();
+          const userType = perms?.user_type;
+          if (userType === "underwriter" || userType === "manager") {
+            navigate("/underwriter", { replace: true });
+          } else {
+            navigate("/dashboard", { replace: true });
+          }
+        } else {
+          // Fallback to default dashboard on failure
+          navigate("/dashboard", { replace: true });
+        }
+      } catch {
+        navigate("/dashboard", { replace: true });
+      }
+    } catch (err: any) {
       toast({
-        title: "Login Successful",
-        description: "Welcome back to Drive Peak!",
+        title: "Login failed",
+        description: err?.data?.detail || err?.message || "Invalid credentials",
+        variant: "destructive",
       });
-      navigate("/dashboard");
     }
   };
 
@@ -75,8 +104,9 @@ const Login = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-primary hover:bg-primary-dark"
+                disabled={login.isPending}
               >
-                Login
+                {login.isPending ? "Logging in..." : "Login"}
               </Button>
             </form>
 

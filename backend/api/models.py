@@ -255,3 +255,51 @@ class Payment(models.Model):
     
     def __str__(self):
         return f"Payment {self.payment_id} - {self.amount}"
+
+class Notification(models.Model):
+    NOTIF_TYPES = [
+        ('quotation', 'Quotation'),
+        ('status_update', 'Status Update'),
+        ('message', 'Message'),
+    ]
+
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    type = models.CharField(max_length=20, choices=NOTIF_TYPES, default='message')
+    payload = models.JSONField(default=dict, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notification to {self.recipient.username}: {self.title}"
+
+class Quotation(models.Model):
+    STATUS_CHOICES = [
+        ("sent", "Sent"),
+        ("accepted", "Accepted"),
+        ("declined", "Declined"),
+    ]
+
+    quote_id = models.CharField(max_length=20, unique=True, blank=True)
+    policy = models.ForeignKey(InsurancePolicy, on_delete=models.CASCADE, related_name="quotations")
+    premium_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    coverage_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default="USD")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="sent", db_index=True)
+    terms = models.TextField(blank=True)
+    bank_details = models.JSONField(default=dict, blank=True)
+    payment_url = models.CharField(max_length=255, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_quotations")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    customer_decision_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="decided_quotations")
+
+    def save(self, *args, **kwargs):
+        if not self.quote_id:
+            self.quote_id = f"QTE{str(uuid.uuid4().hex[:8]).upper()}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Quotation {self.quote_id} for {self.policy.policy_number} ({self.status})"

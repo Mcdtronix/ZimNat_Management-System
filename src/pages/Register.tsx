@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -21,6 +22,7 @@ const Register = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { register } = useAuth();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -30,13 +32,30 @@ const Register = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Registration Successful",
-      description: "Your account has been created successfully!",
-    });
-    navigate("/login");
+    try {
+      await register.mutateAsync({
+        email: formData.email,
+        password: formData.password,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        address_no: formData.addressNo,
+        street: formData.street,
+        town: formData.town,
+        phone_number: formData.contactNo || undefined,
+        national_id: formData.nic || undefined,
+      });
+      toast({ title: "Registered", description: "Welcome!" });
+      navigate("/dashboard");
+    } catch (err: any) {
+      const firstError = typeof err?.data === 'object' ? Object.values(err.data)[0] : undefined;
+      toast({
+        title: "Registration failed",
+        description: Array.isArray(firstError) ? String(firstError[0]) : (err?.data?.error || err?.message || "Please check your details"),
+        variant: "destructive",
+      });
+    }
   };
 
   const handleReset = () => {
@@ -182,12 +201,14 @@ const Register = () => {
 
               {/* Submit Buttons */}
               <div className="flex gap-4 pt-6">
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="bg-primary hover:bg-primary-dark"
+                  disabled={register.isPending}
                 >
-                  Submit
+                  {register.isPending ? "Submitting..." : "Submit"}
                 </Button>
+
                 <Button 
                   type="button" 
                   variant="outline" 

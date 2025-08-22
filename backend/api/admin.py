@@ -12,6 +12,7 @@ from .models import (
     ContactInquiry,
     DashboardStats,
     Payment,
+    Notification,
 )
 
 
@@ -115,3 +116,10 @@ class PaymentAdmin(admin.ModelAdmin):
     list_display = ("payment_id", "policy", "amount", "payment_method", "status", "payment_date")
     list_filter = ("payment_method", "status", "payment_date")
     search_fields = ("payment_id", "policy__policy_number", "transaction_reference")
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("title", "recipient", "type", "is_read", "created_at")
+    list_filter = ("type", "is_read", "created_at")
+    search_fields = ("title", "message", "recipient__username", "recipient__email")

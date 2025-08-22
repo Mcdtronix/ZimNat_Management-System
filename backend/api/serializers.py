@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from decimal import Decimal
 
 from .models import (
     Customer,
@@ -13,6 +14,8 @@ from .models import (
     ContactInquiry,
     DashboardStats,
     Payment,
+    Notification,
+    Quotation,
 )
 
 
@@ -98,14 +101,15 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 
 class VehicleCategorySerializer(serializers.ModelSerializer):
+    display_name = serializers.CharField(source='get_name_display', read_only=True)
     class Meta:
         model = VehicleCategory
-        fields = ['id', 'name', 'description', 'is_active', 'created_at']
+        fields = ['id', 'name', 'display_name', 'description', 'is_active', 'created_at']
         read_only_fields = ['created_at']
 
 
 class VehicleSerializer(serializers.ModelSerializer):
-    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
+    customer = serializers.PrimaryKeyRelatedField(read_only=True)
     category = serializers.PrimaryKeyRelatedField(queryset=VehicleCategory.objects.all())
 
     class Meta:
@@ -118,15 +122,19 @@ class VehicleSerializer(serializers.ModelSerializer):
 
 
 class InsuranceCoverageSerializer(serializers.ModelSerializer):
+    display_name = serializers.CharField(source='get_name_display', read_only=True)
+
     class Meta:
         model = InsuranceCoverage
-        fields = ['id', 'name', 'description', 'features', 'max_coverage_amount', 'is_active']
+        fields = ['id', 'name', 'display_name', 'description', 'features', 'max_coverage_amount', 'is_active']
 
 
 class InsurancePolicySerializer(serializers.ModelSerializer):
-    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
+    customer = serializers.PrimaryKeyRelatedField(read_only=True)
     vehicle = serializers.PrimaryKeyRelatedField(queryset=Vehicle.objects.all())
     coverage = serializers.PrimaryKeyRelatedField(queryset=InsuranceCoverage.objects.all())
+    premium_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    coverage_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
 
     class Meta:
         model = InsurancePolicy
@@ -143,6 +151,10 @@ class InsurancePolicySerializer(serializers.ModelSerializer):
         start_date = attrs.get('start_date') or getattr(self.instance, 'start_date', None)
         end_date = attrs.get('end_date') or getattr(self.instance, 'end_date', None)
         status = attrs.get('status') or getattr(self.instance, 'status', None)
+
+        # Ensure start_date is not after end_date
+        if start_date and end_date and start_date > end_date:
+            raise serializers.ValidationError({'end_date': 'end_date must be on or after start_date.'})
 
         # Ensure policy customer matches vehicle owner
         if vehicle and customer and vehicle.customer_id != customer.id:
@@ -163,10 +175,18 @@ class InsurancePolicySerializer(serializers.ModelSerializer):
 
         return attrs
 
+    def create(self, validated_data):
+        # Default monetary fields on application if not provided
+        if 'premium_amount' not in validated_data or validated_data.get('premium_amount') is None:
+            validated_data['premium_amount'] = Decimal('0')
+        if 'coverage_amount' not in validated_data or validated_data.get('coverage_amount') is None:
+            validated_data['coverage_amount'] = Decimal('0')
+        return super().create(validated_data)
+
 
 class ClaimSerializer(serializers.ModelSerializer):
     policy = serializers.PrimaryKeyRelatedField(queryset=InsurancePolicy.objects.all())
-    processed_by = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), allow_null=True, required=False)
+    processed_by = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True, required=False)
     customer = serializers.SerializerMethodField(read_only=True)
     vehicle_number = serializers.SerializerMethodField(read_only=True)
 
@@ -178,13 +198,35 @@ class ClaimSerializer(serializers.ModelSerializer):
             'processed_by', 'created_at', 'updated_at',
             'customer', 'vehicle_number'
         ]
-        read_only_fields = ['claim_id', 'claim_date', 'created_at', 'updated_at', 'customer', 'vehicle_number']
+        read_only_fields = ['claim_id', 'claim_date', 'created_at', 'updated_at', 'customer', 'vehicle_number', 'processed_by']
 
     def get_customer(self, obj):
         return obj.policy.customer_id if obj.policy_id else None
 
-    def get_vehicle_number(self, obj):
-        return obj.policy.vehicle.vehicle_number if obj.policy_id and obj.policy.vehicle_id else None
+
+class QuotationSerializer(serializers.ModelSerializer):
+    policy = serializers.PrimaryKeyRelatedField(queryset=InsurancePolicy.objects.all())
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    decided_by = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Quotation
+        fields = [
+            'id', 'quote_id', 'policy', 'premium_amount', 'coverage_amount', 'currency',
+            'status', 'terms', 'bank_details', 'payment_url',
+            'created_by', 'created_at', 'updated_at', 'customer_decision_at', 'decided_by',
+        ]
+        read_only_fields = ['quote_id', 'created_by', 'created_at', 'updated_at', 'customer_decision_at', 'decided_by']
+
+    def validate_premium_amount(self, value):
+        if value is None or Decimal(str(value)) <= 0:
+            raise serializers.ValidationError('premium_amount must be greater than 0.')
+        return value
+
+    def validate_coverage_amount(self, value):
+        if value is None or Decimal(str(value)) <= 0:
+            raise serializers.ValidationError('coverage_amount must be greater than 0.')
+        return value
 
 
 class ClaimDocumentSerializer(serializers.ModelSerializer):
@@ -194,6 +236,12 @@ class ClaimDocumentSerializer(serializers.ModelSerializer):
         model = ClaimDocument
         fields = ['id', 'claim', 'document_type', 'document', 'uploaded_at']
         read_only_fields = ['uploaded_at']
+
+    def validate_document_type(self, value):
+        allowed = {'police_report', 'id_document'}
+        if value not in allowed:
+            raise serializers.ValidationError(f"document_type must be one of {allowed}")
+        return value
 
 
 class ContactInquirySerializer(serializers.ModelSerializer):
@@ -240,3 +288,14 @@ class QuoteResponseSerializer(serializers.Serializer):
     currency = serializers.ChoiceField(choices=[('ZWL', 'ZWL'), ('USD', 'USD')])
     breakdown = serializers.ListField(child=serializers.DictField(), required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    recipient = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'recipient', 'title', 'message', 'type', 'payload', 'is_read', 'created_at'
+        ]
+        read_only_fields = ['recipient', 'created_at']

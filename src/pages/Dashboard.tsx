@@ -1,9 +1,8 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, BarChart3, User, FileText, AlertTriangle, LogOut } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getAuthToken } from "@/lib/api";
 import { 
   BarChart, 
   Bar, 
@@ -13,172 +12,170 @@ import {
   ResponsiveContainer 
 } from "recharts";
 
-const chartData = [
-  { year: "2020", value: 35 },
-  { year: "2021", value: 49 },
-  { year: "2022", value: 44 },
-  { year: "2023", value: 24 },
-  { year: "2024", value: 52 },
-];
+type KPIs = {
+  // customer view
+  active_policies?: number;
+  total_claims?: number;
+  pending_claims?: number;
+  vehicles?: number;
+  // staff view
+  total_customers?: number;
+};
+
+type AnalyticsOverview = {
+  monthly_data: { month: number; month_name: string; claims: number; policies: number }[];
+  year: number;
+};
+
+type ClaimsList = {
+  claims: Array<{
+    id: number;
+    claim_id: string;
+    vehicle_number: string;
+    estimated_amount: string;
+    approval_status: string;
+    status: string;
+    customer_name: string;
+    created_at: string;
+  }>;
+};
+
+function authFetch<T = any>(url: string): Promise<T> {
+  const token = getAuthToken();
+  return fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  }).then(async (res) => {
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    return res.json();
+  });
+}
 
 const Dashboard = () => {
-  const navigate = useNavigate();
-  const [user] = useState({ name: "kumal sandaru", role: "Chief Engineer" });
+  const kpis = useQuery<KPIs>({ queryKey: ["dashboard","kpis"], queryFn: () => authFetch("/api/dashboard/data/") });
+  const analytics = useQuery<AnalyticsOverview>({ queryKey: ["dashboard","analytics"], queryFn: () => authFetch("/api/analytics/overview/") });
+  const claims = useQuery<ClaimsList>({ queryKey: ["dashboard","claims"], queryFn: () => authFetch("/api/claims/data/") });
 
-  const handleLogout = () => {
-    navigate("/login");
-  };
+  const monthly = analytics.data?.monthly_data || [];
+  const chartData = monthly.map((m) => ({ name: m.month_name.slice(0,3), claims: m.claims, policies: m.policies }));
+
+  const isLoading = kpis.isLoading || analytics.isLoading || claims.isLoading;
+  const isError = kpis.isError || analytics.isError || claims.isError;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-primary text-primary-foreground">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="bg-white text-primary px-3 py-1 rounded font-bold text-lg">
-              PEAK
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm">Hello {user.name} !</span>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleLogout}
-              className="text-primary-foreground hover:bg-white/20"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+      <main className="flex-1 p-6">
+        {/* Breadcrumb */}
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
+          <span>Dashboard</span>
+          <ChevronRight className="h-4 w-4" />
+          <span>Overview</span>
         </div>
-      </header>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white shadow-sm min-h-[calc(100vh-4rem)]">
-          <nav className="p-4 space-y-2">
-            <Link 
-              to="/dashboard" 
-              className="flex items-center justify-between p-3 rounded-lg bg-gray-100 text-gray-900 font-medium"
-            >
-              <div className="flex items-center space-x-3">
-                <BarChart3 className="h-5 w-5" />
-                <span>Dashboard</span>
-              </div>
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-            
-            <Link 
-              to="/profile" 
-              className="flex items-center justify-between p-3 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <User className="h-5 w-5" />
-                <span>My Profile</span>
-              </div>
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-            
-            <Link 
-              to="/claims" 
-              className="flex items-center justify-between p-3 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <FileText className="h-5 w-5" />
-                <span>Claim List</span>
-              </div>
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-            
-            <Link 
-              to="/claim-intimation" 
-              className="flex items-center justify-between p-3 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <AlertTriangle className="h-5 w-5" />
-                <span>Claim Intimation</span>
-              </div>
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </nav>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 p-6">
-          {/* Breadcrumb */}
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
-            <span>Dashboard</span>
-            <ChevronRight className="h-4 w-4" />
-            <span>Chief engineer Dashboard</span>
+        <div className="space-y-6">
+          {isError && (
+            <div className="rounded border border-red-200 bg-red-50 text-red-700 px-4 py-2 text-sm">
+              Failed to load some dashboard data. Please try again.
+            </div>
+          )}
+          {/* KPIs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card><CardContent className="p-6">
+              <div className="text-sm text-muted-foreground">Active Policies</div>
+              <div className="mt-2 text-2xl font-bold">{kpis.data?.active_policies ?? 0}</div>
+            </CardContent></Card>
+            <Card><CardContent className="p-6">
+              <div className="text-sm text-muted-foreground">Total Claims</div>
+              <div className="mt-2 text-2xl font-bold">{kpis.data?.total_claims ?? 0}</div>
+            </CardContent></Card>
+            <Card><CardContent className="p-6">
+              <div className="text-sm text-muted-foreground">Pending Claims</div>
+              <div className="mt-2 text-2xl font-bold text-orange-600">{kpis.data?.pending_claims ?? 0}</div>
+            </CardContent></Card>
+            <Card><CardContent className="p-6">
+              <div className="text-sm text-muted-foreground">Vehicles / Customers</div>
+              <div className="mt-2 text-2xl font-bold">{(kpis.data?.vehicles ?? kpis.data?.total_customers) ?? 0}</div>
+            </CardContent></Card>
           </div>
 
-          {/* Content */}
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold mb-2">Chief Engineer Dashboard</h1>
-              <p className="text-muted-foreground">content here</p>
-            </div>
-
-            {/* Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <span>Analytics Overview</span>
-                  <Badge variant="secondary" className="text-xs">undefined</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
+          {/* Analytics Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span>Monthly Analytics</span>
+                <Badge variant="secondary" className="text-xs">{analytics.data?.year ?? "--"}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                {analytics.isLoading ? (
+                  <div className="h-full w-full animate-pulse bg-gray-100 rounded" />
+                ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="year" 
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis 
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Bar 
-                        dataKey="value" 
-                        fill="#00B4D8"
-                        radius={[4, 4, 0, 0]}
-                      />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                      <YAxis axisLine={false} tickLine={false} />
+                      <Bar dataKey="claims" fill="#0ea5e9" radius={[4,4,0,0]} />
+                      <Bar dataKey="policies" fill="#22c55e" radius={[4,4,0,0]} />
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="text-2xl font-bold text-primary">52</div>
-                  <p className="text-sm text-muted-foreground">Total Claims (2024)</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="text-2xl font-bold text-green-600">24</div>
-                  <p className="text-sm text-muted-foreground">Approved Claims</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="text-2xl font-bold text-orange-600">28</div>
-                  <p className="text-sm text-muted-foreground">Pending Claims</p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </main>
-      </div>
+          {/* Recent Claims */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Claims</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {claims.isLoading && <div className="h-24 animate-pulse bg-gray-100 rounded" />}
+              {claims.isError && <div className="text-red-600 text-sm">Failed to load claims.</div>}
+              {!claims.isLoading && !claims.isError && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-muted-foreground">
+                        <th className="py-2 pr-4">Claim ID</th>
+                        <th className="py-2 pr-4">Vehicle</th>
+                        <th className="py-2 pr-4">Customer</th>
+                        <th className="py-2 pr-4">Est. Amount</th>
+                        <th className="py-2 pr-4">Status</th>
+                        <th className="py-2 pr-4">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(claims.data?.claims || []).slice(0,5).map((c) => (
+                        <tr key={c.id} className="border-t">
+                          <td className="py-2 pr-4 font-medium">{c.claim_id}</td>
+                          <td className="py-2 pr-4">{c.vehicle_number}</td>
+                          <td className="py-2 pr-4">{c.customer_name}</td>
+                          <td className="py-2 pr-4">${c.estimated_amount}</td>
+                          <td className="py-2 pr-4">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${c.approval_status === 'approved' ? 'bg-green-100 text-green-700' : c.approval_status === 'pending' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'}`}>
+                              {c.approval_status}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-4">{c.created_at}</td>
+                        </tr>
+                      ))}
+                      {(!claims.data || claims.data.claims.length === 0) && (
+                        <tr>
+                          <td colSpan={6} className="py-6 text-center text-muted-foreground">No claims yet.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
     </div>
   );
 };
