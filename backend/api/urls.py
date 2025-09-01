@@ -34,7 +34,11 @@ from .views import (
     dashboard_data,
     claims_data,
     register_api,
+    verify_registration_otp,
+    resend_registration_otp,
     EmailTokenObtainPairView,
+    password_reset_request,
+    password_reset_confirm,
 )
 
 router = DefaultRouter()
@@ -57,6 +61,10 @@ urlpatterns = [
     path('api/auth/jwt/refresh/', TokenRefreshView.as_view(), name='jwt_token_refresh'),
     path('api/auth/jwt/verify/', TokenVerifyView.as_view(), name='jwt_token_verify'),
     path('api/auth/register/', register_api, name='auth_register'),
+    path('api/auth/verify-otp/', verify_registration_otp, name='auth_verify_otp'),
+    path('api/auth/resend-otp/', resend_registration_otp, name='auth_resend_otp'),
+    path('api/auth/password-reset/', password_reset_request, name='auth_password_reset'),
+    path('api/auth/password-reset-confirm/', password_reset_confirm, name='auth_password_reset_confirm'),
 
     # Utility
     path('api/health/', health_check, name='health_check'),

@@ -22,6 +22,22 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.username} ({self.get_user_type_display()})"
 
+class TwoFactorCode(models.Model):
+    """One-time code for registration verification (2FA on first login).
+
+    Codes are short-lived and single-use. We only require this during initial
+    registration to activate the account.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="two_factor_codes")
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    attempts = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"2FA for {self.user.username} (used={self.is_used})"
+
 class Customer(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='customer_profile')
     customer_id = models.CharField(max_length=20, unique=True)
@@ -114,17 +130,25 @@ class InsurancePolicy(models.Model):
             raise ValidationError({
                 'customer': 'Policy customer must match the vehicle owner (customer).'
             })
-        # Prevent overlapping policies for same vehicle when status active/pending
-        if self.vehicle and self.start_date and self.end_date:
-            overlapping = InsurancePolicy.objects.filter(
-                vehicle=self.vehicle,
-            ).exclude(pk=self.pk).filter(
-                status__in=['active', 'pending'],
-                start_date__lte=self.end_date,
-                end_date__gte=self.start_date,
-            ).exists()
-            if overlapping:
-                raise ValidationError('Overlapping active/pending policy exists for this vehicle and date range.')
+        # Prevent overlapping policies for the SAME coverage type on the SAME vehicle
+        # Allow one Comprehensive and one Third Party concurrently, but not two of the same type
+        if self.vehicle and self.coverage_id and self.start_date and self.end_date:
+            overlapping_same_type = (
+                InsurancePolicy.objects.filter(
+                    vehicle=self.vehicle,
+                    coverage=self.coverage,
+                )
+                .exclude(pk=self.pk)
+                .filter(
+                    status__in=['active', 'pending'],
+                    start_date__lte=self.end_date,
+                    end_date__gte=self.start_date,
+                )
+                .exists()
+            )
+            if overlapping_same_type:
+                cov_display = self.coverage.get_name_display() if hasattr(self.coverage, 'get_name_display') else 'this coverage'
+                raise ValidationError(f'An active/pending {cov_display} policy already exists for this vehicle in the selected period.')
 
     def save(self, *args, **kwargs):
         if not self.policy_number:

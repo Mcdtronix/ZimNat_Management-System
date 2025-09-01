@@ -68,6 +68,7 @@ class RegisterSerializer(serializers.Serializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             user_type='customer',
+            is_active=False,  # require OTP verification before activation
         )
         # optional fields
         phone = validated_data.get('phone_number')
@@ -202,6 +203,14 @@ class ClaimSerializer(serializers.ModelSerializer):
 
     def get_customer(self, obj):
         return obj.policy.customer_id if obj.policy_id else None
+
+    def get_vehicle_number(self, obj):
+        try:
+            if obj.policy_id and obj.policy and obj.policy.vehicle_id:
+                return obj.policy.vehicle.vehicle_number
+        except Exception:
+            pass
+        return None
 
 
 class QuotationSerializer(serializers.ModelSerializer):
