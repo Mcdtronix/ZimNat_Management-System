@@ -23,23 +23,23 @@ const MotorInsurance = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="text-3xl font-bold mb-6">Hello!</h2>
-            <h3 className="text-xl font-semibold mb-4 text-primary">We're DrivePeak Insurance</h3>
+            <h3 className="text-xl font-semibold mb-4 text-primary">We're Zimnat Insurance</h3>
             <p className="text-muted-foreground leading-relaxed mb-6">
-              DrivePeak is your trusted partner in vehicle insurance management.
+              Zimnat is your trusted partner in vehicle insurance management.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-6">
               Our cutting-edge platform harnesses the latest technology to deliver seamless, efficient, and personalized solutions tailored to your needs.
             </p>
             <p className="text-muted-foreground leading-relaxed">
-              With DrivePeak, you can navigate insurance processes effortlessly, ensuring peace of mind and financial security on the road ahead.
+              With Zimnat, you can navigate insurance processes effortlessly, ensuring peace of mind and financial security on the road ahead.
             </p>
           </div>
           
           <Card className="bg-primary text-white">
             <CardContent className="p-8">
-              <h3 className="text-2xl font-bold mb-6">"Drive Peak Protecting Your Investment with Precision Protection"</h3>
+              <h3 className="text-2xl font-bold mb-6">"Zimnat Protecting Your Investment with Precision Protection"</h3>
               <p className="mb-6 opacity-90">
-                "Drive Peak Safeguarding Your Vehicle, Securing Your Peace of Mind" signifies our dedication to protecting your vehicle with comprehensive coverage, advanced security measures, and unparalleled peace of mind.
+                "Zimnat Safeguarding Your Vehicle, Securing Your Peace of Mind" signifies our dedication to protecting your vehicle with comprehensive coverage, advanced security measures, and unparalleled peace of mind.
               </p>
               <div className="space-y-2">
                 <h4 className="font-semibold">FOR YOU</h4>
@@ -56,10 +56,10 @@ const MotorInsurance = () => {
         </div>
       </section>
 
-      {/* Drive Peak Group */}
+      {/* Zimnat Group */}
       <section className="bg-gray-50 py-16">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-8">DRIVE PEAK GROUP OF INSURANCE COMPANIES</h2>
+          <h2 className="text-3xl font-bold mb-8">Zimnat GROUP OF INSURANCE COMPANIES</h2>
           <p className="text-lg text-muted-foreground leading-relaxed mb-12">
             Peak Vehicle Insurance provides customized coverage, leveraging cutting-edge technology for personalized premiums and proactive risk management. Our dedicated team 
             offers expert guidance and support throughout your insurance journey, ensuring peace of mind on the road. With our comprehensive protection and superior service, Drive 
@@ -68,13 +68,13 @@ const MotorInsurance = () => {
           </p>
           <div className="bg-primary/10 p-6 rounded-lg">
             <p className="text-lg font-semibold text-center text-primary">
-              "Drive Peak Simplifying Insurance, Amplifying Confidence"
+              "Zimnat Simplifying Insurance, Amplifying Confidence"
             </p>
           </div>
         </div>
       </section>
 
-      {/* Drive Peak Features */}
+      {/* Zimnat Features */}
       <section className="container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="order-2 lg:order-1">
@@ -84,22 +84,22 @@ const MotorInsurance = () => {
           </div>
           
           <div className="order-1 lg:order-2">
-            <h2 className="text-3xl font-bold mb-6">DRIVE PEAK</h2>
+            <h2 className="text-3xl font-bold mb-6">Zimnat</h2>
             <h3 className="text-xl font-semibold mb-4 text-primary">The Best Option</h3>
             <p className="text-muted-foreground leading-relaxed mb-6">
-              "Drive Peak" encapsulates our commitment to safeguarding your vehicle and securing your peace of mind. With tailored coverage, advanced technology, and dedicated support, we ensure 
-              comprehensive protection for your journeys. Trust in Drive Peak for reliability, innovation, and a community-driven approach to insurance, where your safety and satisfaction are our top 
-              priorities.Drive Peak is a top choice for vehicle insurance, offering comprehensive coverage tailored to your needs. With competitive rates and excellent customer service, they prioritize your peace of 
+              "Zimnat" encapsulates our commitment to safeguarding your vehicle and securing your peace of mind. With tailored coverage, advanced technology, and dedicated support, we ensure 
+              comprehensive protection for your journeys. Trust in Zimnat for reliability, innovation, and a community-driven approach to insurance, where your safety and satisfaction are our top 
+              priorities.Zimnat is a top choice for vehicle insurance, offering comprehensive coverage tailored to your needs. With competitive rates and excellent customer service, they prioritize your peace of 
               mind on the road.
             </p>
             <p className="text-lg font-semibold text-primary">
-              "Drive Peak Your Reliable Shield Against the Unexpected"
+              "Zimnat Your Reliable Shield Against the Unexpected"
             </p>
           </div>
         </div>
       </section>
 
-      {/* Second Drive Peak Section */}
+      {/* Second Zimnat Section */}
       <section className="bg-gray-50 py-16">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -108,14 +108,14 @@ const MotorInsurance = () => {
             </div>
             
             <div>
-              <h2 className="text-3xl font-bold mb-6">DRIVE PEAK</h2>
+              <h2 className="text-3xl font-bold mb-6">Zimnat</h2>
               <h3 className="text-xl font-semibold mb-4 text-primary">The Best Option</h3>
               <p className="text-muted-foreground leading-relaxed mb-6">
                 Our values at Peak Vehicle Insurance encompass integrity, innovation, reliability, and community. We prioritize transparency and honesty in all interactions, constantly innovating to meet evolving needs, ensuring reliable 
                 protection, and fostering a sense of belonging within our community.
               </p>
               <p className="text-lg font-semibold text-primary">
-                "Drive Peak: Where Your Vehicle's Protection Matters Most"
+                "Zimnat: Where Your Vehicle's Protection Matters Most"
               </p>
             </div>
           </div>
@@ -127,7 +127,7 @@ const MotorInsurance = () => {
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-bold mb-6">Ready to Get Protected?</h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Join thousands of satisfied customers who trust Drive Peak for their vehicle insurance needs. 
+            Join thousands of satisfied customers who trust Zimnat for their vehicle insurance needs. 
             Get a personalized quote today and experience the difference.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -38,6 +38,22 @@ export default function Policies() {
   const { data: policies } = useQuery<Policy[]>({ queryKey: ["policies"], queryFn: () => api("/api/policies/") });
   const { data: vehicles } = useQuery<Vehicle[]>({ queryKey: ["vehicles"], queryFn: () => api("/api/vehicles/") });
   const { data: coverages } = useQuery<Coverage[]>({ queryKey: ["coverages"], queryFn: () => api("/api/insurance-coverages/") });
+  // Permissions to detect underwriter/manager for title and scope awareness
+  const { data: perms } = useQuery({
+    queryKey: ["user-permissions"],
+    queryFn: async () => {
+      const token = getAuthToken();
+      const res = await fetch("/api/user-permissions/", {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) throw new Error("Failed to load permissions");
+      return res.json();
+    },
+  });
+  const isUnderwriter = perms?.user_type === "underwriter" || perms?.user_type === "manager";
 
   // Normalize potential paginated responses into arrays
   const policiesList = useMemo<Policy[]>(() => {
@@ -62,7 +78,7 @@ export default function Policies() {
     <div className="p-6">
       <Card>
         <CardHeader>
-          <CardTitle>My Policies</CardTitle>
+          <CardTitle>{isUnderwriter ? "Company Policies" : "My Policies"}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>

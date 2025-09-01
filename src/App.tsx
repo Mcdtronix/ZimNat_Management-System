@@ -12,6 +12,9 @@ import Contact from "./pages/Contact";
 import MotorInsurance from "./pages/MotorInsurance";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import VerifyOtp from "./pages/VerifyOtp";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Claims from "./pages/Claims";
 import NotFound from "./pages/NotFound";
@@ -24,6 +27,8 @@ import Profile from "./pages/Profile";
 import UnderwriterDashboard from "./pages/UnderwriterDashboard";
 import VehicleDetails from "./pages/VehicleDetails";
 import PaymentCheckout from "./pages/PaymentCheckout";
+import UnderwriterQuotes from "./pages/UnderwriterQuotes";
+import PolicyDetails from "./pages/PolicyDetails";
 
 const queryClient = new QueryClient();
 
@@ -40,12 +45,25 @@ const App = () => (
           <Route path="/motor-insurance" element={<Layout hideSidebar><MotorInsurance /></Layout>} />
           <Route path="/login" element={<Layout><Login /></Layout>} />
           <Route path="/register" element={<Layout><Register /></Layout>} />
+          <Route path="/verify-otp" element={<Layout><VerifyOtp /></Layout>} />
+          <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
+          <Route path="/reset-password/:uidb64/:token" element={<Layout><ResetPassword /></Layout>} />
           <Route
             path="/underwriter"
             element={
               <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_manage_policies", "can_manage_claims"]}>
                 <Layout>
                   <UnderwriterDashboard />
+                </Layout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/underwriter/quotes"
+            element={
+              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_manage_policies"]}>
+                <Layout>
+                  <UnderwriterQuotes />
                 </Layout>
               </RoleProtectedRoute>
             }
@@ -96,6 +114,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Policies />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/policies/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PolicyDetails />
                 </Layout>
               </ProtectedRoute>
             }

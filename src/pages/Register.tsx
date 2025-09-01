@@ -35,7 +35,7 @@ const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await register.mutateAsync({
+      const res = await register.mutateAsync({
         email: formData.email,
         password: formData.password,
         first_name: formData.firstName,
@@ -46,8 +46,8 @@ const Register = () => {
         phone_number: formData.contactNo || undefined,
         national_id: formData.nic || undefined,
       });
-      toast({ title: "Registered", description: "Welcome!" });
-      navigate("/dashboard");
+      toast({ title: "Registration submitted", description: "Enter the OTP we sent to verify your account." });
+      navigate("/verify-otp", { state: { email: formData.email, otp_hint: (res as any)?.otp_hint } });
     } catch (err: any) {
       const firstError = typeof err?.data === 'object' ? Object.values(err.data)[0] : undefined;
       toast({

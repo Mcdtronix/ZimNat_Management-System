@@ -7,7 +7,7 @@ const About = () => {
       <section className="relative h-64 bg-gradient-to-r from-slate-800 to-slate-600 text-white">
         <div className="absolute inset-0 bg-black/30"></div>
         <div className="relative container mx-auto px-4 h-full flex items-center justify-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-center">About Drive Peak</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-center">About Zimnat</h1>
         </div>
       </section>
 
@@ -16,10 +16,10 @@ const About = () => {
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardContent className="p-8">
-              <h2 className="text-3xl font-bold mb-6">DRIVE PEAK</h2>
+              <h2 className="text-3xl font-bold mb-6">Zimnat</h2>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                DrivePeak is your trusted partner in vehicle insurance management. Our cutting-edge platform harnesses the latest technology to deliver seamless, efficient, and personalized solutions 
-                tailored to your needs. With DrivePeak, you can navigate insurance processes effortlessly, ensuring peace of mind and financial security on the road ahead.
+                Zimnat is your trusted partner in vehicle insurance management. Our cutting-edge platform harnesses the latest technology to deliver seamless, efficient, and personalized solutions 
+                tailored to your needs. With Zimnat, you can navigate insurance processes effortlessly, ensuring peace of mind and financial security on the road ahead.
               </p>
             </CardContent>
           </Card>

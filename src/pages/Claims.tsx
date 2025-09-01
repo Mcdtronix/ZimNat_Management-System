@@ -53,26 +53,47 @@ const statusVariant = (s: string) => {
 export default function Claims() {
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery<Claim[]>({ queryKey: ["claims"], queryFn: () => api("/api/claims/") });
+  // Determine role to adjust title and actions visibility
+  const { data: perms } = useQuery({
+    queryKey: ["user-permissions"],
+    queryFn: async () => {
+      const token = getAuthToken();
+      const res = await fetch("/api/user-permissions/", {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) throw new Error("Failed to load permissions");
+      return res.json();
+    },
+  });
+  const isUnderwriter = perms?.user_type === "underwriter" || perms?.user_type === "manager";
 
   // Normalize to array in case backend returns a paginated object
   const claimsList = useMemo<Claim[]>(() => {
-    if (Array.isArray(data)) return data;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data as any)?.results ?? [];
+    const arr = Array.isArray(data) ? data : (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((data as any)?.results ?? [])
+    );
+    // Order by latest created_at desc
+    return arr.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [data]);
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Claims</h1>
-        <Link to="/claims/create">
-          <Button>New Claim</Button>
-        </Link>
+        <h1 className="text-xl font-semibold">{isUnderwriter ? "Company Claims" : "Claims"}</h1>
+        {!isUnderwriter && (
+          <Link to="/claims/create">
+            <Button>New Claim</Button>
+          </Link>
+        )}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Your Claims</CardTitle>
+          <CardTitle>{isUnderwriter ? "All Claims (Latest First)" : "Your Claims"}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (

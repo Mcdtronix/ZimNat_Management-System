@@ -21,10 +21,7 @@ export function useAuth() {
 
   const register = useMutation({
     mutationFn: registerApi,
-    onSuccess: (data) => {
-      setAuthTokens(data.access, data.refresh);
-      // storage event fired by setAuthTokens; state will sync via listener
-    },
+    // Registration now requires OTP verification. Do NOT set tokens here.
   });
 
   function logout() {

@@ -162,3 +162,7 @@ tags
 .vscode/
 
 # End of .gitignore file
+
+# Allow frontend src/lib utilities even if generic lib/ is ignored above
+!src/lib/
+!src/lib/**

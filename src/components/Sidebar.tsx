@@ -25,23 +25,26 @@ const Sidebar: React.FC<SidebarProps> = ({ open }) => {
       return res.json();
     },
   });
+  const { data: unread } = useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: async () => {
+      const token = getAuthToken();
+      const res = await fetch("/api/notifications/unread_count/", {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) throw new Error("Failed to load unread count");
+      return res.json();
+    },
+    // Poll periodically to reflect new notifications
+    refetchInterval: 15000,
+  });
+  const unreadCount = Math.max(0, Number(unread?.count || 0));
   const isUnderwriter = perms?.user_type === "underwriter" || perms?.user_type === "manager";
-  const dashboardPath = isUnderwriter ? "/underwriter" : "/dashboard";
-  // Active check supports underwriter tabs via query param
-  const isActive = (path: string) => {
-    if (!isUnderwriter) return location.pathname === path;
-    // For underwriter, map tab-aware paths like "/underwriter?tab=vehicles"
-    try {
-      const u = new URL(path, window.location.origin);
-      if (u.pathname !== location.pathname) return false;
-      const targetTab = u.searchParams.get("tab");
-      if (!targetTab) return location.pathname === u.pathname;
-      const current = new URLSearchParams(location.search).get("tab") || "policies";
-      return current === targetTab;
-    } catch {
-      return location.pathname === path;
-    }
-  };
+  // Simplified active check: no tab-based highlighting anymore
+  const isActive = (path: string) => location.pathname === path;
 
   const item = (
     to: string,
@@ -66,11 +69,25 @@ const Sidebar: React.FC<SidebarProps> = ({ open }) => {
     >
       <div className={open ? "flex items-center space-x-3" : "flex items-center"}>
         {icon}
+        {/* Show compact unread badge when closed for Inbox */}
+        {!open && label === "Inbox" && unreadCount > 0 && (
+          <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] min-w-[1rem] h-4 px-1">
+            {Math.min(unreadCount, 99)}
+          </span>
+        )}
         {/* Hide label when closed */}
         <span className={open ? "block text-sm" : "hidden"}>{label}</span>
       </div>
       {/* Hide chevron when closed */}
-      {open && <ChevronRight className="h-4 w-4" />}
+      {open && (
+        label === "Inbox" && unreadCount > 0 ? (
+          <span className="ml-auto inline-flex items-center justify-center rounded-full bg-red-600 text-white text-xs min-w-[1.25rem] h-5 px-1.5">
+            {Math.min(unreadCount, 99)}
+          </span>
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )
+      )}
     </Link>
   );
 
@@ -82,11 +99,11 @@ const Sidebar: React.FC<SidebarProps> = ({ open }) => {
       }
     >
       <nav className="p-2 md:p-3 space-y-2">
-        {item(isUnderwriter ? "/underwriter?tab=policies" : "/dashboard", "Dashboard", <BarChart3 className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter?tab=policies" : "/dashboard"))}
-        {item(isUnderwriter ? "/underwriter?tab=vehicles" : "/vehicles", "Vehicles", <Car className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter?tab=vehicles" : "/vehicles"))}
-        {item(isUnderwriter ? "/underwriter?tab=policies" : "/policies", "Policies", <FileText className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter?tab=policies" : "/policies"))}
-        {item(isUnderwriter ? "/underwriter?tab=inquiries" : "/inbox", "Inbox", <Inbox className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter?tab=inquiries" : "/inbox"))}
-        {item(isUnderwriter ? "/underwriter?tab=claims" : "/claims", "Claim List", <FileText className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter?tab=claims" : "/claims"))}
+        {item(isUnderwriter ? "/underwriter" : "/dashboard", "Dashboard", <BarChart3 className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter" : "/dashboard"))}
+        {item("/vehicles", "Vehicles", <Car className="h-5 w-5" />, isActive("/vehicles"))}
+        {item("/policies", "Policies", <FileText className="h-5 w-5" />, isActive("/policies"))}
+        {item("/inbox", "Inbox", <Inbox className="h-5 w-5" />, isActive("/inbox"))}
+        {item("/claims", "Claim List", <FileText className="h-5 w-5" />, isActive("/claims"))}
         {item("/claims/create", "Claim Intimation", <AlertTriangle className="h-5 w-5" />, isActive("/claims/create"))}
       </nav>
     </aside>

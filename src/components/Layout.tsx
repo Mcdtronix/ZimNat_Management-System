@@ -17,6 +17,9 @@ const Layout = ({ children, hideSidebar = false }: LayoutProps) => {
   const navigate = useNavigate();
   const [isAuthed, setIsAuthed] = useState(!!getAuthToken());
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Idle logout after 15 minutes of inactivity
+  const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+  let idleTimer: number | undefined;
 
   useEffect(() => {
     const onStorage = () => setIsAuthed(!!getAuthToken());
@@ -28,11 +31,30 @@ const Layout = ({ children, hideSidebar = false }: LayoutProps) => {
     };
     window.addEventListener("auth:logout", onAuthLogout as EventListener);
 
+    // Idle timeout handlers (only when authenticated)
+    const activities = ["mousemove", "keydown", "click", "scroll", "touchstart"] as const;
+    const resetIdleTimer = () => {
+      if (!isAuthed) return;
+      if (idleTimer) window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(() => {
+        // Clear tokens and broadcast logout
+        clearAuthTokens();
+        window.dispatchEvent(new Event("auth:logout"));
+      }, IDLE_TIMEOUT_MS);
+    };
+    const addActivityListeners = () => activities.forEach((evt) => window.addEventListener(evt, resetIdleTimer));
+    const removeActivityListeners = () => activities.forEach((evt) => window.removeEventListener(evt, resetIdleTimer));
+    addActivityListeners();
+    resetIdleTimer();
+
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("auth:logout", onAuthLogout as EventListener);
+      removeActivityListeners();
+      if (idleTimer) window.clearTimeout(idleTimer);
     };
-  }, []);
+  // Re-run when auth state changes so timer activates/deactivates accordingly
+  }, [isAuthed, navigate]);
 
   const handleLogout = () => {
     clearAuthTokens();
@@ -43,7 +65,7 @@ const Layout = ({ children, hideSidebar = false }: LayoutProps) => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen overflow-hidden flex flex-col">
       {/* Header */}
       <header className="bg-primary text-primary-foreground sticky top-0 z-50">
         <div className="w-full pr-0 pl-4 md:pl-5">
@@ -61,7 +83,7 @@ const Layout = ({ children, hideSidebar = false }: LayoutProps) => {
               )}
               <Link to="/" className="flex items-center space-x-2 h-10">
                 <div className="bg-white text-primary px-3 rounded font-bold text-lg h-10 flex items-center">
-                  PEAK
+                  Zimnat
                 </div>
               </Link>
             </div>
@@ -129,68 +151,32 @@ const Layout = ({ children, hideSidebar = false }: LayoutProps) => {
       {/* Main Content */}
       <div className="flex flex-1 min-h-0">
         {isAuthed && !hideSidebar && <Sidebar open={sidebarOpen} />}
-        <main className="flex-1">
+        <main className="flex-1 min-h-0 overflow-y-auto">
           {children}
         </main>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-white">
-        <div className="container mx-auto px-4 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* Hotline */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Hotline</h3>
-              <div className="space-y-2 text-sm text-gray-300">
-                <p>+94 77 185 4709</p>
-                <p>+94 77 185 4709</p>
-                <p>+94 77 185 4709</p>
-                <p>info@drivepeak.lk</p>
-              </div>
-            </div>
-
-            {/* Head Office */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Head Office</h3>
-              <div className="space-y-2 text-sm text-gray-300">
-                <p>Rakshana Mandiraya</p>
-                <p>No.21,</p>
-                <p>Vauxhall Street,</p>
-                <p>Colombo 02,</p>
-                <p>Sri Lanka</p>
-              </div>
-            </div>
-
-            {/* Footer Links */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-              <div className="space-y-2 text-sm">
-                <Link to="/" className="block text-gray-300 hover:text-white transition-colors">Home</Link>
-                <Link to="/about" className="block text-gray-300 hover:text-white transition-colors">About Us</Link>
-                <Link to="/contact" className="block text-gray-300 hover:text-white transition-colors">Contact Us</Link>
-                <Link to="/motor-insurance" className="block text-gray-300 hover:text-white transition-colors">Motor Insurance</Link>
-              </div>
-            </div>
-
-            {/* Social Media */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Get social with us</h3>
-              <div className="flex space-x-4">
-                <Facebook className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
-                <Twitter className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
-                <Instagram className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
-                <Linkedin className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
-                <Youtube className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
-              </div>
+      {/* Footer (2x navbar height = 2 * 4rem = 8rem) */}
+      <footer className="bg-slate-900 text-white flex flex-col h-32">
+        <div className="container mx-auto px-4 py-3 flex-1 flex items-center justify-center">
+          {/* Social Media */}
+          <div className="text-center">
+            <h3 className="text-lg font-semibold mb-3">Get social with us</h3>
+            <div className="flex items-center justify-center space-x-4">
+              <Facebook className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
+              <Twitter className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
+              <Instagram className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
+              <Linkedin className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
+              <Youtube className="h-6 w-6 text-gray-300 hover:text-white cursor-pointer transition-colors" />
             </div>
           </div>
         </div>
 
         {/* Copyright */}
         <div className="border-t border-gray-800">
-          <div className="container mx-auto px-4 py-4">
+          <div className="container mx-auto px-4 py-2">
             <p className="text-center text-sm text-gray-400">
-              Copyright © 2024 Drive Peak. All rights reserved.
+              Copyright © 2024 Zimnat. All rights reserved.
             </p>
           </div>
         </div>

@@ -211,7 +211,7 @@ const Contact = () => {
                   <Mail className="h-5 w-5 mr-2 text-primary" />
                   Email
                 </h3>
-                <p className="text-muted-foreground">info@drivepeak.lk</p>
+                <p className="text-muted-foreground">info@zimnat.co.zw</p>
               </CardContent>
             </Card>
 

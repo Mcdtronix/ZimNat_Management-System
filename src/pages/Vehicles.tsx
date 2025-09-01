@@ -24,6 +24,11 @@ interface Vehicle {
   market_value?: string;
 }
 
+interface Policy {
+  id: number;
+  vehicle: number | { id: number };
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ""; // e.g. http://localhost:8000
 const api = async (path: string, init?: RequestInit) => {
   const token = getAuthToken();
@@ -67,12 +72,51 @@ const Vehicles = () => {
     queryFn: () => api("/api/vehicles/")
   });
 
+  // Permissions to detect underwriter/manager
+  const { data: perms } = useQuery({
+    queryKey: ["user-permissions"],
+    queryFn: async () => {
+      const token = getAuthToken();
+      const res = await fetch("/api/user-permissions/", {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) throw new Error("Failed to load permissions");
+      return res.json();
+    },
+  });
+  const isUnderwriter = perms?.user_type === "underwriter" || perms?.user_type === "manager";
+
+  // Policies for filtering vehicles (only needed for underwriters/managers)
+  const { data: policies } = useQuery<Policy[] | { results: Policy[] }>({
+    queryKey: ["policies", "for-vehicle-filter"],
+    queryFn: () => api("/api/policies/"),
+    enabled: !!isUnderwriter,
+  });
+
   // Normalize vehicles into an array to handle paginated or direct array responses
   const vehiclesList = useMemo<Vehicle[]>(() => {
     if (Array.isArray(vehicles)) return vehicles;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (vehicles as any)?.results ?? [];
   }, [vehicles]);
+
+  const vehiclesWithPolicies = useMemo<Vehicle[]>(() => {
+    if (!isUnderwriter) return vehiclesList;
+    // Normalize policies array
+    const pols: Policy[] = Array.isArray(policies)
+      ? policies
+      : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((policies as any)?.results ?? []);
+    const vehicleIds = new Set<number>();
+    pols.forEach((p) => {
+      const vid = typeof p.vehicle === "object" ? p.vehicle?.id : p.vehicle;
+      if (vid) vehicleIds.add(vid);
+    });
+    return vehiclesList.filter((v) => vehicleIds.has(v.id));
+  }, [isUnderwriter, policies, vehiclesList]);
 
   const resetForm = () => {
     setEditing(null);
@@ -119,6 +163,7 @@ const Vehicles = () => {
   return (
     <div className="p-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {!isUnderwriter && (
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>{editing ? "Edit Vehicle" : "Add Vehicle"}</CardTitle>
@@ -182,10 +227,11 @@ const Vehicles = () => {
             </form>
           </CardContent>
         </Card>
+        )}
 
-        <Card className="lg:col-span-2">
+        <Card className={"lg:col-span-2" + (isUnderwriter ? " lg:col-span-3" : "") }>
           <CardHeader>
-            <CardTitle>My Vehicles</CardTitle>
+            <CardTitle>{isUnderwriter ? "Company Vehicles with Policies" : "My Vehicles"}</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -198,23 +244,25 @@ const Vehicles = () => {
                     <TableHead>Category</TableHead>
                     <TableHead>Make/Model</TableHead>
                     <TableHead>Year</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    {!isUnderwriter && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vehiclesList.map(v => (
+                  {vehiclesWithPolicies.map(v => (
                     <TableRow key={v.id}>
                       <TableCell>{v.vehicle_number}</TableCell>
                       <TableCell>{categoryList.find(c => c.id === v.category)?.display_name || categoryList.find(c => c.id === v.category)?.name || v.category}</TableCell>
                       <TableCell>{v.make} {v.model}</TableCell>
                       <TableCell>{v.year}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button size="sm" variant="outline" onClick={() => setEditing(v)}>Edit</Button>
-                        <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(v.id)}>Delete</Button>
-                        <Link to={`/apply-policy?vehicle=${v.id}`}>
-                          <Button size="sm">Apply Policy</Button>
-                        </Link>
-                      </TableCell>
+                      {!isUnderwriter && (
+                        <TableCell className="text-right space-x-2">
+                          <Button size="sm" variant="outline" onClick={() => setEditing(v)}>Edit</Button>
+                          <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(v.id)}>Delete</Button>
+                          <Link to={`/apply-policy?vehicle=${v.id}`}>
+                            <Button size="sm">Apply Policy</Button>
+                          </Link>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

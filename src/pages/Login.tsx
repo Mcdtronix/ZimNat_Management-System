@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getAuthToken } from "@/lib/api";
 
 const Login = () => {
-  const [email, setEmail] = useState("vishal@gmail.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
