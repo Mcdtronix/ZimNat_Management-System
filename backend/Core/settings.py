@@ -206,6 +206,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:8080',
     'http://127.0.0.1:8080',
     'https://zimnat.pythonanywhere.com/',
+     "https://zim-nat-management-system.vercel.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -217,6 +218,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8080',
     'http://127.0.0.1:8080',
     'https://zimnat.pythonanywhere.com/',
+    'https://zim-nat-management-system.vercel.app',
 ]
 
 # Session/Cookie settings suitable for React + SessionAuth in development
