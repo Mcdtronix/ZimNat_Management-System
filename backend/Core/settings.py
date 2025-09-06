@@ -30,6 +30,7 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 # Hosts allowed to access the backend (add your deployment hostnames as needed)
 ALLOWED_HOSTS = [
+    '*',
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
@@ -140,8 +141,12 @@ SPECTACULAR_SETTINGS = {
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'Zimnat$default',   # your database name
+        'USER': 'Zimnat',           # your username
+        'PASSWORD': 'aqi16@khayz', # replace with your actual MySQL password
+        'HOST': 'Zimnat.mysql.pythonanywhere-services.com',
+        'PORT': '3306',
     }
 }
 
@@ -200,6 +205,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:3000',
     'http://localhost:8080',
     'http://127.0.0.1:8080',
+    'https://zimnat.pythonanywhere.com/',
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -210,6 +216,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:3000',
     'http://localhost:8080',
     'http://127.0.0.1:8080',
+    'https://zimnat.pythonanywhere.com/',
 ]
 
 # Session/Cookie settings suitable for React + SessionAuth in development
@@ -217,6 +224,8 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = False  # set True in production behind HTTPS
 CSRF_COOKIE_SECURE = False     # set True in production behind HTTPS
+SESSION_COOKIE_SECURE = not DEBUG  # set True in production behind HTTPS
+CSRF_COOKIE_SECURE = not DEBUG     # set True in production behind HTTPS
 
 # SimpleJWT configuration (JWT auth for React)
 SIMPLE_JWT = {
