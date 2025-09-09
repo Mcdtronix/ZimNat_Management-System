@@ -44,7 +44,7 @@ from .serializers import (
     ClaimDocumentSerializer,
 )
 from .utils import send_otp
-from .permissions import IsOwnerOrReadOnly, IsStaffOrReadOnly
+from .permissions import IsOwnerOrReadOnly, IsStaffOrReadOnly, CustomerDataAccessPermission, IsCustomerOwnerOnly, CanProcessClaims, CanApproveClaims, IsManager, IsUnderwriter
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.mail import send_mail
@@ -142,10 +142,19 @@ class DashboardOverviewView(generics.GenericAPIView):
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CustomerDataAccessPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     search_fields = ['user__first_name', 'user__last_name', 'customer_id', 'user__email']
     filterset_fields = ['town', 'date_registered']
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.user_type == 'customer':
+            try:
+                return Customer.objects.filter(id=user.customer_profile.id)
+            except AttributeError:
+                return Customer.objects.none()
+        return super().get_queryset()
 
 class CustomerListView(generics.ListAPIView):
     queryset = Customer.objects.all()
@@ -165,7 +174,7 @@ class VehicleCategoryViewSet(viewsets.ReadOnlyModelViewSet):
 class VehicleViewSet(viewsets.ModelViewSet):
     queryset = Vehicle.objects.all()
     serializer_class = VehicleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CustomerDataAccessPermission]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['category', 'customer']
 
@@ -213,7 +222,7 @@ class InsuranceCoverageViewSet(viewsets.ReadOnlyModelViewSet):
 class InsurancePolicyViewSet(viewsets.ModelViewSet):
     queryset = InsurancePolicy.objects.all()
     serializer_class = InsurancePolicySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CustomerDataAccessPermission]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['status', 'customer', 'coverage']
 
@@ -616,7 +625,7 @@ class InsurancePolicyViewSet(viewsets.ModelViewSet):
 class QuotationViewSet(viewsets.ModelViewSet):
     queryset = Quotation.objects.all()
     serializer_class = QuotationSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CustomerDataAccessPermission]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['status', 'policy', 'policy__customer']
     ordering = ['-created_at']
@@ -748,7 +757,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CustomerDataAccessPermission]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['status', 'payment_method', 'policy__customer']
 
@@ -800,7 +809,7 @@ class ContactInquiryViewSet(viewsets.ModelViewSet):
 class ClaimViewSet(viewsets.ModelViewSet):
     queryset = Claim.objects.all()
     serializer_class = ClaimSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CustomerDataAccessPermission]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['status', 'approval_status', 'policy__customer']
     ordering_fields = ['created_at', 'estimated_amount']
@@ -926,7 +935,7 @@ class ClaimViewSet(viewsets.ModelViewSet):
 class ClaimDocumentViewSet(viewsets.ModelViewSet):
     queryset = ClaimDocument.objects.all()
     serializer_class = ClaimDocumentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CustomerDataAccessPermission]
     http_method_names = ['get', 'post', 'delete']
 
     def get_queryset(self):
@@ -1303,21 +1312,68 @@ def health_check(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_permissions(request):
+    """Return user permissions and profile data for frontend routing."""
     user = request.user
     
-    permissions = {
-        'can_view_dashboard': True,
-        'can_manage_claims': user.user_type in ['manager', 'underwriter'],
-        'can_approve_claims': user.user_type in ['manager'],
-        'can_manage_customers': user.user_type in ['manager'],
-        'can_generate_reports': user.user_type in ['manager', 'underwriter'],
-        'can_manage_policies': user.user_type in ['manager', 'underwriter'],
+    # Base user data
+    user_data = {
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
         'user_type': user.user_type,
-        'is_customer': user.user_type == 'customer',
-        'is_staff': user.is_staff or user.user_type in ['manager', 'underwriter'],
+        'is_active': user.is_active,
     }
     
-    return Response(permissions)
+    # Role-specific permissions and data
+    permissions = {
+        'can_view_dashboard': True,
+        'can_manage_vehicles': user.user_type in ['customer', 'manager', 'underwriter'],
+        'can_apply_policies': user.user_type == 'customer',
+        'can_submit_claims': user.user_type == 'customer',
+        'can_process_claims': user.user_type in ['manager', 'underwriter'],
+        'can_approve_claims': user.user_type == 'manager',
+        'can_quote_policies': user.user_type in ['manager', 'underwriter'],
+        'can_manage_customers': user.user_type in ['manager', 'underwriter'],
+        'can_view_all_data': user.user_type in ['manager', 'underwriter'],
+        'is_staff': user.user_type in ['manager', 'underwriter'] or user.is_staff,
+        'is_customer': user.user_type == 'customer',
+        'is_manager': user.user_type == 'manager',
+        'is_underwriter': user.user_type == 'underwriter',
+    }
+    
+    # Customer-specific data
+    customer_data = None
+    if user.user_type == 'customer':
+        try:
+            customer = user.customer_profile
+            customer_data = {
+                'customer_id': customer.customer_id,
+                'address_no': customer.address_no,
+                'street': customer.street,
+                'town': customer.town,
+                'date_registered': customer.date_registered,
+            }
+        except AttributeError:
+            # Customer profile doesn't exist
+            permissions['needs_profile_setup'] = True
+    
+    return Response({
+        'user': user_data,
+        'permissions': permissions,
+        'customer_profile': customer_data,
+        'dashboard_route': _get_dashboard_route(user.user_type),
+    })
+
+def _get_dashboard_route(user_type):
+    """Return appropriate dashboard route based on user type."""
+    if user_type == 'customer':
+        return '/dashboard'
+    elif user_type in ['manager', 'underwriter']:
+        return '/admin-dashboard'
+    else:
+        return '/dashboard'
 
 # Template Views
 class HomeTemplateView(TemplateView):

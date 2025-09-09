@@ -21,9 +21,12 @@ interface VehicleCategory { id: number; name: string; }
 interface Vehicle { id: number; vehicle_number: string; category: number; }
 interface Coverage { id: number; name: string; }
 
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
 const api = async (path: string) => {
   const token = getAuthToken();
-  const res = await fetch(path, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
   if (!res.ok) throw new Error("Failed to fetch");
   return res.json();
 };
@@ -43,7 +46,7 @@ export default function Policies() {
     queryKey: ["user-permissions"],
     queryFn: async () => {
       const token = getAuthToken();
-      const res = await fetch("/api/user-permissions/", {
+      const res = await fetch(`${API_BASE}/api/user-permissions/`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),

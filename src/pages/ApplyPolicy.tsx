@@ -23,9 +23,12 @@ function normalizeList<T = any>(data: any): T[] {
   return [];
 }
 
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
 const api = async (path: string, init?: RequestInit) => {
   const token = getAuthToken();
-  const res = await fetch(path, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     ...init,
     headers: {
       ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),

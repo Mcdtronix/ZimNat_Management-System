@@ -1,13 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { getAuthToken, API_BASE } from "@/lib/api";
 import { Link } from "react-router-dom";
+import { Bell, BellRing, CheckCircle, Clock, Filter, Mail, MailOpen, MessageSquare, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Notification {
   id: number;
@@ -21,7 +26,8 @@ interface Notification {
 
 const api = async (path: string, init?: RequestInit) => {
   const token = getAuthToken();
-  const res = await fetch(path, {
+  const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  const res = await fetch(url, {
     ...init,
     headers: {
       ...(init?.headers || {}),
@@ -29,31 +35,125 @@ const api = async (path: string, init?: RequestInit) => {
       ...(init?.body && !(init.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
     },
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || `HTTP ${res.status}`);
+  }
+  const contentType = res.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return res.json();
+  }
+  return null;
 };
 
 export default function Inbox() {
   const qc = useQueryClient();
-  const { data } = useQuery<Notification[]>({ queryKey: ["notifications"], queryFn: () => api("/api/notifications/") });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("newest");
+  
+  const { data, isLoading, error } = useQuery<Notification[]>({
+    queryKey: ["notifications"],
+    queryFn: () => api("/api/notifications/"),
+    refetchInterval: 30000,
+    staleTime: 10000,
+  });
+  
   const { data: perms } = useQuery({
     queryKey: ["user-permissions"],
     queryFn: async () => api("/api/user-permissions/")
   });
+  
   const isUnderwriter = perms?.user_type === "underwriter" || perms?.user_type === "manager";
+  
+  const { data: unreadCount } = useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: () => api("/api/notifications/unread_count/"),
+    refetchInterval: 30000,
+  });
 
-  // Normalize to array in case backend returns a paginated object
   const notificationsList = useMemo<Notification[]>(() => {
-    if (Array.isArray(data)) return data;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data as any)?.results ?? [];
+    let notifications: Notification[] = [];
+    if (Array.isArray(data)) {
+      notifications = data;
+    } else {
+      notifications = (data as any)?.results ?? [];
+    }
+
+    if (searchQuery) {
+      notifications = notifications.filter(n => 
+        n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        n.message.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    if (filterType !== "all") {
+      notifications = notifications.filter(n => n.type === filterType);
+    }
+
+    if (filterStatus === "unread") {
+      notifications = notifications.filter(n => !n.is_read);
+    } else if (filterStatus === "read") {
+      notifications = notifications.filter(n => n.is_read);
+    }
+
+    notifications.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      
+      switch (sortBy) {
+        case "oldest":
+          return dateA - dateB;
+        case "unread":
+          if (a.is_read !== b.is_read) {
+            return a.is_read ? 1 : -1;
+          }
+          return dateB - dateA;
+        case "type":
+          if (a.type !== b.type) {
+            return a.type.localeCompare(b.type);
+          }
+          return dateB - dateA;
+        default:
+          return dateB - dateA;
+      }
+    });
+
+    return notifications;
+  }, [data, searchQuery, filterType, filterStatus, sortBy]);
+
+  const stats = useMemo(() => {
+    const all = Array.isArray(data) ? data : (data as any)?.results ?? [];
+    return {
+      total: all.length,
+      unread: all.filter((n: Notification) => !n.is_read).length,
+      quotations: all.filter((n: Notification) => n.type === "quotation").length,
+      messages: all.filter((n: Notification) => n.type === "message").length,
+    };
   }, [data]);
 
   const markRead = useMutation({
     mutationFn: (id: number) => api(`/api/notifications/${id}/read/`, { method: "POST" }),
     onSuccess: () => {
+      toast.success("Notification marked as read");
       qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to mark as read: ${error.message}`);
+    },
+  });
+
+  const markAllRead = useMutation({
+    mutationFn: () => api("/api/notifications/mark_all_read/", { method: "POST" }),
+    onSuccess: () => {
+      toast.success("All notifications marked as read");
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to mark all as read: ${error.message}`);
     },
   });
 
@@ -140,61 +240,275 @@ export default function Inbox() {
     window.URL.revokeObjectURL(href);
   }
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (diffInHours < 168) {
+      return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'quotation':
+        return <Bell className="h-4 w-4" />;
+      case 'message':
+        return <MessageSquare className="h-4 w-4" />;
+      case 'status_update':
+        return <CheckCircle className="h-4 w-4" />;
+      default:
+        return <Mail className="h-4 w-4" />;
+    }
+  };
+
+  useEffect(() => {
+    const handleFocus = () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [qc]);
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center text-red-600">
+              <p>Failed to load notifications: {error.message}</p>
+              <Button 
+                onClick={() => qc.invalidateQueries({ queryKey: ["notifications"] })} 
+                className="mt-4"
+              >
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <BellRing className="h-6 w-6" />
+            <h1 className="text-2xl font-bold">Inbox</h1>
+            {stats.unread > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {stats.unread} unread
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {stats.unread > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => markAllRead.mutate()}
+                disabled={markAllRead.isPending}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Mark all read
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => qc.invalidateQueries({ queryKey: ["notifications"] })}
+            >
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total</p>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                </div>
+                <Mail className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Unread</p>
+                  <p className="text-2xl font-bold text-red-600">{stats.unread}</p>
+                </div>
+                <MailOpen className="h-8 w-8 text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Quotations</p>
+                  <p className="text-2xl font-bold text-blue-600">{stats.quotations}</p>
+                </div>
+                <Bell className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Messages</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.messages}</p>
+                </div>
+                <MessageSquare className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search notifications..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="quotation">Quotations</SelectItem>
+                  <SelectItem value="message">Messages</SelectItem>
+                  <SelectItem value="status_update">Status Updates</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="unread">Unread</SelectItem>
+                  <SelectItem value="read">Read</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="unread">Unread First</SelectItem>
+                  <SelectItem value="type">By Type</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Inbox</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Notifications ({notificationsList.length})</span>
+            {isLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>}
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {notificationsList.map(n => (
-            <div key={n.id} className="flex items-start justify-between gap-4 border rounded-md p-3 cursor-pointer" onClick={() => setOpenId(n.id)}>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{n.title}</span>
-                  <Badge variant={n.type === "quotation" ? "default" : "secondary"} className="capitalize">{n.type}</Badge>
-                  {!n.is_read && <Badge variant="destructive">New</Badge>}
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">{n.message}</div>
-                {n.type === "quotation" && (
-                  <div className="mt-2 text-sm space-y-1">
-                    <div>
-                      <span className="font-medium">Policy:</span> {n.payload?.policy_number}
-                    </div>
-                    <div className="flex gap-4">
-                      <div><span className="font-medium">Premium:</span> {n.payload?.currency || 'USD'} {n.payload?.premium_amount}</div>
-                      <div><span className="font-medium">Cover:</span> {n.payload?.currency || 'USD'} {n.payload?.coverage_amount}</div>
-                    </div>
-                    {n.payload?.terms && (
-                      <div className="text-muted-foreground"><span className="font-medium text-foreground">Terms:</span> {n.payload.terms}</div>
-                    )}
-                    {n.payload?.bank_details && (
-                      <div className="text-muted-foreground">
-                        <span className="font-medium text-foreground">Bank details:</span> {n.payload.bank_details.bank} • {n.payload.bank_details.account_number} • {n.payload.bank_details.branch}
+        <CardContent>
+          <ScrollArea className="h-[600px]">
+            <div className="space-y-3">
+              {notificationsList.map((n, index) => (
+                <div key={n.id}>
+                  <div 
+                    className={`flex items-start justify-between gap-4 border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
+                      !n.is_read ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                    }`} 
+                    onClick={() => setOpenId(n.id)}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        {getTypeIcon(n.type)}
+                        <span className={`font-semibold ${!n.is_read ? 'text-blue-900' : ''}`}>{n.title}</span>
+                        <Badge variant={n.type === "quotation" ? "default" : "secondary"} className="capitalize">
+                          {n.type.replace('_', ' ')}
+                        </Badge>
+                        {!n.is_read && <Badge variant="destructive">New</Badge>}
+                        <span className="text-xs text-muted-foreground ml-auto">{formatDate(n.created_at)}</span>
                       </div>
-                    )}
-                    <div className="pt-1">
-                      {typeof n.payload?.quotation_id === 'number' && (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Button size="sm" variant="default" onClick={() => acceptQuote.mutate(n.payload.quotation_id)} disabled={acceptQuote.isPending}>Accept</Button>
-                          <Button size="sm" variant="outline" onClick={() => declineQuote.mutate(n.payload.quotation_id)} disabled={declineQuote.isPending}>Decline</Button>
-                          {n.payload?.payment_url && (
-                            <Link to={n.payload.payment_url}>
-                              <Button size="sm" variant="secondary">Pay Online</Button>
-                            </Link>
+                      <div className="text-sm text-muted-foreground">{n.message}</div>
+                      {n.type === "quotation" && (
+                        <div className="mt-2 text-sm space-y-1">
+                          <div>
+                            <span className="font-medium">Policy:</span> {n.payload?.policy_number}
+                          </div>
+                          <div className="flex gap-4">
+                            <div><span className="font-medium">Premium:</span> {n.payload?.currency || 'USD'} {n.payload?.premium_amount}</div>
+                            <div><span className="font-medium">Cover:</span> {n.payload?.currency || 'USD'} {n.payload?.coverage_amount}</div>
+                          </div>
+                          {n.payload?.terms && (
+                            <div className="text-muted-foreground"><span className="font-medium text-foreground">Terms:</span> {n.payload.terms}</div>
                           )}
+                          {n.payload?.bank_details && (
+                            <div className="text-muted-foreground">
+                              <span className="font-medium text-foreground">Bank details:</span> {n.payload.bank_details.bank} • {n.payload.bank_details.account_number} • {n.payload.bank_details.branch}
+                            </div>
+                          )}
+                          <div className="pt-1">
+                            {typeof n.payload?.quotation_id === 'number' && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Button size="sm" variant="default" onClick={(e) => { e.stopPropagation(); acceptQuote.mutate(n.payload.quotation_id); }} disabled={acceptQuote.isPending}>Accept</Button>
+                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); declineQuote.mutate(n.payload.quotation_id); }} disabled={declineQuote.isPending}>Decline</Button>
+                                {n.payload?.payment_url && (
+                                  <Link to={n.payload.payment_url}>
+                                    <Button size="sm" variant="secondary">Pay Online</Button>
+                                  </Link>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
+                    {!n.is_read && (
+                      <Button size="sm" onClick={(e) => { e.stopPropagation(); markRead.mutate(n.id); }} disabled={markRead.isPending}>Mark read</Button>
+                    )}
                   </div>
-                )}
-              </div>
-              {!n.is_read && (
-                <Button size="sm" onClick={() => markRead.mutate(n.id)} disabled={markRead.isPending}>Mark read</Button>
+                  {index < notificationsList.length - 1 && <Separator />}
+                </div>
+              ))}
+              {!notificationsList.length && (
+                <div className="text-center py-8">
+                  <Mail className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No notifications found</p>
+                  {(searchQuery || filterType !== "all" || filterStatus !== "all") && (
+                    <p className="text-sm text-muted-foreground mt-2">Try adjusting your filters</p>
+                  )}
+                </div>
               )}
             </div>
-          ))}
-          {!notificationsList.length && <div className="text-sm text-muted-foreground">No notifications.</div>}
+          </ScrollArea>
         </CardContent>
       </Card>
 

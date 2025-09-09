@@ -100,3 +100,107 @@ class IsCustomer(permissions.BasePermission):
     def has_permission(self, request, view):
         user = request.user
         return user.is_authenticated and user.user_type == 'customer'
+
+
+class IsCustomerOwnerOnly(permissions.BasePermission):
+    """Customers can only access their own data, staff can access all."""
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        
+        # Staff can access everything
+        if _is_staff_like(user):
+            return True
+            
+        # Customers can only access their own data
+        if user.user_type == 'customer':
+            try:
+                customer_profile = user.customer_profile
+                
+                # Direct customer objects
+                if hasattr(obj, 'customer') and obj.customer == customer_profile:
+                    return True
+                    
+                # Policy objects
+                if hasattr(obj, 'policy') and obj.policy.customer == customer_profile:
+                    return True
+                    
+                # Vehicle objects
+                if obj.__class__.__name__ == 'Vehicle' and obj.customer == customer_profile:
+                    return True
+                    
+                # Customer profile itself
+                if obj.__class__.__name__ == 'Customer' and obj == customer_profile:
+                    return True
+                    
+                # User object itself
+                if obj.__class__.__name__ == 'User' and obj == user:
+                    return True
+                    
+                return False
+            except AttributeError:
+                return False
+                
+        return False
+
+
+class CustomerDataAccessPermission(permissions.BasePermission):
+    """Ensures customers can only access their own data across all models."""
+    
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+    
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        
+        # Staff users (managers, underwriters) have full access
+        if _is_staff_like(user):
+            return True
+            
+        # Customer users can only access their own data
+        if user.user_type == 'customer':
+            return self._is_customer_data(user, obj)
+            
+        return False
+    
+    def _is_customer_data(self, user, obj):
+        """Check if the object belongs to the customer."""
+        try:
+            customer_profile = user.customer_profile
+        except AttributeError:
+            return False
+            
+        # Check different object types
+        obj_class = obj.__class__.__name__
+        
+        if obj_class == 'Customer':
+            return obj == customer_profile
+            
+        elif obj_class == 'Vehicle':
+            return obj.customer == customer_profile
+            
+        elif obj_class == 'InsurancePolicy':
+            return obj.customer == customer_profile
+            
+        elif obj_class == 'Claim':
+            return obj.policy.customer == customer_profile
+            
+        elif obj_class == 'Payment':
+            return obj.policy.customer == customer_profile
+            
+        elif obj_class == 'Quotation':
+            return obj.policy.customer == customer_profile
+            
+        elif obj_class == 'Notification':
+            return obj.recipient == user
+            
+        elif obj_class == 'ContactInquiry':
+            return obj.customer == customer_profile if obj.customer else False
+            
+        elif obj_class == 'User':
+            return obj == user
+            
+        return False

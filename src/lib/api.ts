@@ -1,7 +1,7 @@
 // Centralized API client for the frontend
 // Uses Vite env var VITE_BACKEND_URL, defaulting to http://localhost:8000
 
-export const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://zimnat.pythonanywhere.com/";
+export const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 export function getAuthToken() {
   return localStorage.getItem("access_token");

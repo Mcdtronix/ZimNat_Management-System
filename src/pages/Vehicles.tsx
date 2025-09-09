@@ -29,7 +29,7 @@ interface Policy {
   vehicle: number | { id: number };
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || ""; // e.g. http://localhost:8000
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 const api = async (path: string, init?: RequestInit) => {
   const token = getAuthToken();
   const url = `${API_BASE}${path}`;
@@ -77,7 +77,7 @@ const Vehicles = () => {
     queryKey: ["user-permissions"],
     queryFn: async () => {
       const token = getAuthToken();
-      const res = await fetch("/api/user-permissions/", {
+      const res = await fetch(`${API_BASE}/api/user-permissions/`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
