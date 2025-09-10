@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { getAuthToken, API_BASE } from "@/lib/api";
+import { getAuthToken } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { Bell, BellRing, CheckCircle, Clock, Filter, Mail, MailOpen, MessageSquare, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,6 +23,8 @@ interface Notification {
   is_read: boolean;
   created_at: string;
 }
+
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://zimnat.pythonanywhere.com/";
 
 const api = async (path: string, init?: RequestInit) => {
   const token = getAuthToken();
@@ -62,7 +64,7 @@ export default function Inbox() {
   
   const { data: perms } = useQuery({
     queryKey: ["user-permissions"],
-    queryFn: async () => api("/api/user-permissions/")
+    queryFn: () => api("/api/user-permissions/")
   });
   
   const isUnderwriter = perms?.user_type === "underwriter" || perms?.user_type === "manager";
@@ -637,3 +639,4 @@ export default function Inbox() {
     </div>
   );
 }
+                    
