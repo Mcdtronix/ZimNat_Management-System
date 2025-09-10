@@ -21,17 +21,13 @@ interface Claim {
   created_at: string;
 }
 
-const api = async (path: string, init?: RequestInit) => {
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://zimnat.pythonanywhere.com/";
+
+const api = async (path: string) => {
   const token = getAuthToken();
-  const res = await fetch(path, {
-    ...init,
-    headers: {
-      ...(init?.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.body && !(init.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
-    },
-  });
-  if (!res.ok) throw new Error(await res.text());
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  if (!res.ok) throw new Error("Failed to fetch");
   return res.json();
 };
 
@@ -53,12 +49,13 @@ const statusVariant = (s: string) => {
 export default function Claims() {
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery<Claim[]>({ queryKey: ["claims"], queryFn: () => api("/api/claims/") });
+  
   // Determine role to adjust title and actions visibility
   const { data: perms } = useQuery({
     queryKey: ["user-permissions"],
     queryFn: async () => {
       const token = getAuthToken();
-      const res = await fetch("/api/user-permissions/", {
+      const res = await fetch(`${API_BASE}/api/user-permissions/`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -72,12 +69,10 @@ export default function Claims() {
 
   // Normalize to array in case backend returns a paginated object
   const claimsList = useMemo<Claim[]>(() => {
-    const arr = Array.isArray(data) ? data : (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((data as any)?.results ?? [])
-    );
-    // Order by latest created_at desc
-    return arr.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    if (Array.isArray(data)) return data.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results = (data as any)?.results ?? [];
+    return results.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [data]);
 
   return (
