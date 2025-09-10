@@ -40,23 +40,20 @@ type ClaimsList = {
   }>;
 };
 
-function authFetch<T = any>(url: string): Promise<T> {
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://zimnat.pythonanywhere.com/";
+
+const api = async (path: string) => {
   const token = getAuthToken();
-  return fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  }).then(async (res) => {
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-    return res.json();
-  });
-}
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  if (!res.ok) throw new Error("Failed to fetch");
+  return res.json();
+};
 
 const Dashboard = () => {
-  const kpis = useQuery<KPIs>({ queryKey: ["dashboard","kpis"], queryFn: () => authFetch("/api/dashboard/data/") });
-  const analytics = useQuery<AnalyticsOverview>({ queryKey: ["dashboard","analytics"], queryFn: () => authFetch("/api/analytics/overview/") });
-  const claims = useQuery<ClaimsList>({ queryKey: ["dashboard","claims"], queryFn: () => authFetch("/api/claims/data/") });
+  const kpis = useQuery<KPIs>({ queryKey: ["dashboard","kpis"], queryFn: () => api("/api/dashboard/data/") });
+  const analytics = useQuery<AnalyticsOverview>({ queryKey: ["dashboard","analytics"], queryFn: () => api("/api/analytics/overview/") });
+  const claims = useQuery<ClaimsList>({ queryKey: ["dashboard","claims"], queryFn: () => api("/api/claims/data/") });
 
   const monthly = analytics.data?.monthly_data || [];
   const chartData = monthly.map((m) => ({ name: m.month_name.slice(0,3), claims: m.claims, policies: m.policies }));
