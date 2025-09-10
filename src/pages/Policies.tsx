@@ -21,7 +21,7 @@ interface VehicleCategory { id: number; name: string; }
 interface Vehicle { id: number; vehicle_number: string; category: number; }
 interface Coverage { id: number; name: string; }
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://zimnat.pythonanywhere.com/";
 
 const api = async (path: string) => {
   const token = getAuthToken();

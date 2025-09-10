@@ -29,7 +29,7 @@ interface Policy {
   vehicle: number | { id: number };
 }
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://zimnat.pythonanywhere.com/";
 const api = async (path: string, init?: RequestInit) => {
   const token = getAuthToken();
   const url = `${API_BASE}${path}`;
