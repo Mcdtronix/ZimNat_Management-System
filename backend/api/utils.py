@@ -11,7 +11,7 @@ def send_otp(user, code: str) -> None:
     """Send OTP to user via email and (optionally) SMS.
 
     - Email: uses Django's configured EMAIL_BACKEND. In dev, console backend is fine.
-    - SMS: if TWILIO_* env vars are present and 'twilio' is installed, send SMS.
+    - SMS: if TWILIO_* settings are configured and 'twilio' is installed, send SMS.
     """
     subject = "Your verification code"
     message = f"Your verification code is: {code}. It expires in 10 minutes."
@@ -28,18 +28,18 @@ def send_otp(user, code: str) -> None:
                 fail_silently=False,
             )
             logger.info("Sent OTP email to %s", recipient)
-        except Exception:
-            logger.exception("Failed to send OTP email to %s", recipient)
+        except Exception as e:
+            logger.exception("Failed to send OTP email to %s: %s", recipient, str(e))
 
     # Send SMS via Twilio if configured and user has a phone number
     phone = getattr(user, "phone_number", None)
-    sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    token = os.environ.get("TWILIO_AUTH_TOKEN")
-    from_number = os.environ.get("TWILIO_FROM_NUMBER")
+    sid = getattr(settings, 'TWILIO_ACCOUNT_SID', '')
+    token = getattr(settings, 'TWILIO_AUTH_TOKEN', '')
+    from_number = getattr(settings, 'TWILIO_FROM_NUMBER', '')
 
     if phone and sid and token and from_number:
         try:
-            from twilio.rest import Client  # type: ignore
+            from twilio.rest import Client
             client = Client(sid, token)
             client.messages.create(
                 body=message,

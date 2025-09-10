@@ -111,15 +111,20 @@ REST_FRAMEWORK = {
 
 # Email configuration
 # Use console backend in development by default. Configure SMTP via env vars in prod.
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = config('EMAIL_HOST', default='localhost')
-EMAIL_PORT = config('EMAIL_PORT', default=25, cast=int)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='gudomacdonald16@gmail.com')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=False, cast=bool)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool)
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='no-reply@example.com')
-FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='http://localhost:5173')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='gudomacdonald16@gmail.com')
+FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='https://zim-nat-management-system.vercel.app/')
+
+# Twilio Configuration for SMS
+TWILIO_ACCOUNT_SID = 'ACca4921310eab06a8f4a048e49e0fc2b8'
+TWILIO_AUTH_TOKEN = 'b1422b7d04af48136ef60ac02b729dcc'
+TWILIO_FROM_NUMBER = '+18723449070'
 
 # drf-spectacular (OpenAPI/Swagger)
 SPECTACULAR_SETTINGS = {
