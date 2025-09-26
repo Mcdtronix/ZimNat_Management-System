@@ -6,7 +6,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import login, authenticate, logout
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Sum, Avg, Q
 from django.utils import timezone
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -1184,11 +1184,15 @@ def analytics_overview(request):
         if policy_customer_filter:
             policies_qs = policies_qs.filter(**policy_customer_filter)
 
+        # Calculate revenue for the month
+        monthly_revenue = policies_qs.aggregate(Sum('premium_amount'))['premium_amount__sum'] or 0
+        
         monthly_data.append({
             'month': month,
             'month_name': month_start.strftime('%B'),
             'claims': claims_qs.count(),
             'policies': policies_qs.count(),
+            'revenue': float(monthly_revenue),
         })
 
     # Category distribution (non-sensitive; for customers we can scope to their vehicles)
@@ -1204,9 +1208,21 @@ def analytics_overview(request):
             'count': count
         })
 
+    # Claims by status (for underwriters only)
+    claims_by_status = []
+    if user.user_type in ['underwriter', 'manager']:
+        from django.db.models import Count
+        claims_status_data = Claim.objects.values('approval_status').annotate(count=Count('id'))
+        for item in claims_status_data:
+            claims_by_status.append({
+                'status': item['approval_status'].title(),
+                'count': item['count']
+            })
+
     return Response({
         'monthly_data': monthly_data,
         'category_distribution': category_data,
+        'claims_by_status': claims_by_status,
         'year': current_year
     })
 
@@ -1371,7 +1387,7 @@ def _get_dashboard_route(user_type):
     if user_type == 'customer':
         return '/dashboard'
     elif user_type in ['manager', 'underwriter']:
-        return '/admin-dashboard'
+        return '/underwriter/dashboard'
     else:
         return '/dashboard'
 
@@ -1604,11 +1620,38 @@ def dashboard_data(request):
         except:
             data = {'active_policies': 0, 'total_claims': 0, 'pending_claims': 0, 'vehicles': 0}
     else:
+        # Enhanced data for underwriters/managers
+        total_claims = Claim.objects.count()
+        pending_claims = Claim.objects.filter(approval_status='pending').count()
+        approved_claims = Claim.objects.filter(approval_status='approve').count()
+        
+        # Calculate total revenue from active policies
+        total_revenue = InsurancePolicy.objects.filter(status='active').aggregate(
+            Sum('premium_amount')
+        )['premium_amount__sum'] or 0
+        
+        # Calculate average claim amount
+        avg_claim_amount = Claim.objects.aggregate(
+            Avg('estimated_amount')
+        )['estimated_amount__avg'] or 0
+        
+        # Policies expiring in next 30 days
+        from datetime import timedelta
+        thirty_days_from_now = timezone.now().date() + timedelta(days=30)
+        policies_expiring_soon = InsurancePolicy.objects.filter(
+            status='active',
+            end_date__lte=thirty_days_from_now
+        ).count()
+        
         data = {
             'total_customers': Customer.objects.count(),
             'active_policies': InsurancePolicy.objects.filter(status='active').count(),
-            'pending_claims': Claim.objects.filter(approval_status='pending').count(),
-            'total_claims': Claim.objects.count(),
+            'pending_claims': pending_claims,
+            'total_claims': total_claims,
+            'total_revenue': float(total_revenue),
+            'claims_approval_rate': (approved_claims / total_claims * 100) if total_claims > 0 else 0,
+            'average_claim_amount': float(avg_claim_amount),
+            'policies_expiring_soon': policies_expiring_soon,
         }
     
     return JsonResponse(data)
