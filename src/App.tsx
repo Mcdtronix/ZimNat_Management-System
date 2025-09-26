@@ -29,6 +29,8 @@ import VehicleDetails from "./pages/VehicleDetails";
 import PaymentCheckout from "./pages/PaymentCheckout";
 import UnderwriterQuotes from "./pages/UnderwriterQuotes";
 import PolicyDetails from "./pages/PolicyDetails";
+import UnderwriterLogin from "./pages/UnderwriterLogin";
+import UnderwriterVehicles from "./pages/UnderwriterVehicles";
 
 const queryClient = new QueryClient();
 
@@ -44,14 +46,15 @@ const App = () => (
           <Route path="/contact" element={<Layout hideSidebar><Contact /></Layout>} />
           <Route path="/motor-insurance" element={<Layout hideSidebar><MotorInsurance /></Layout>} />
           <Route path="/login" element={<Layout><Login /></Layout>} />
+          <Route path="/underwriter" element={<Layout><UnderwriterLogin /></Layout>} />
           <Route path="/register" element={<Layout><Register /></Layout>} />
           <Route path="/verify-otp" element={<Layout><VerifyOtp /></Layout>} />
           <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
           <Route path="/reset-password/:uidb64/:token" element={<Layout><ResetPassword /></Layout>} />
           <Route
-            path="/underwriter"
+            path="/underwriter/dashboard"
             element={
-              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_manage_policies", "can_manage_claims"]}>
+              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_quote_policies", "can_process_claims"]}>
                 <Layout>
                   <UnderwriterDashboard />
                 </Layout>
@@ -61,9 +64,19 @@ const App = () => (
           <Route
             path="/underwriter/quotes"
             element={
-              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_manage_policies"]}>
+              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_quote_policies"]}>
                 <Layout>
                   <UnderwriterQuotes />
+                </Layout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/underwriter/vehicles"
+            element={
+              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_manage_vehicles"]}>
+                <Layout>
+                  <UnderwriterVehicles />
                 </Layout>
               </RoleProtectedRoute>
             }
@@ -109,6 +122,16 @@ const App = () => (
             }
           />
           <Route
+            path="/underwriter/claims"
+            element={
+              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_process_claims"]}>
+                <Layout>
+                  <Claims />
+                </Layout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
             path="/policies"
             element={
               <ProtectedRoute>
@@ -116,6 +139,16 @@ const App = () => (
                   <Policies />
                 </Layout>
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/underwriter/policies"
+            element={
+              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_manage_customers"]}>
+                <Layout>
+                  <Policies />
+                </Layout>
+              </RoleProtectedRoute>
             }
           />
           <Route
@@ -146,6 +179,16 @@ const App = () => (
                   <Inbox />
                 </Layout>
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/underwriter/inbox"
+            element={
+              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_view_all_data"]}>
+                <Layout>
+                  <Inbox />
+                </Layout>
+              </RoleProtectedRoute>
             }
           />
           <Route

@@ -99,6 +99,12 @@ const Layout = ({ children, hideSidebar = false }: LayoutProps) => {
                     Login
                   </Link>
                   <Link 
+                    to="/underwriter" 
+                    className={`hover:text-primary-light transition-colors ${isActive('/underwriter') ? 'text-primary-light' : ''}`}
+                  >
+                    Staff Login
+                  </Link>
+                  <Link 
                     to="/register" 
                     className={`hover:text-primary-light transition-colors ${isActive('/register') ? 'text-primary-light' : ''}`}
                   >

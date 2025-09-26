@@ -17,11 +17,18 @@ const Home = () => {
             <p className="text-xl mb-6">
               Insure your vehicle quickly.
             </p>
-            <Link to="/login">
-              <Button size="lg" className="bg-primary hover:bg-primary-dark">
-                Get Started
-              </Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Link to="/login">
+                <Button size="lg" className="bg-primary hover:bg-primary-dark">
+                  Get Started
+                </Button>
+              </Link>
+              <Link to="/underwriter">
+                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-slate-800">
+                  Staff Login
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>

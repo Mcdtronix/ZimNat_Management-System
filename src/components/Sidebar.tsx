@@ -42,7 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open }) => {
     refetchInterval: 15000,
   });
   const unreadCount = Math.max(0, Number(unread?.count || 0));
-  const isUnderwriter = perms?.user_type === "underwriter" || perms?.user_type === "manager";
+  const isUnderwriter = perms?.user?.user_type === "underwriter" || perms?.user?.user_type === "manager";
   // Simplified active check: no tab-based highlighting anymore
   const isActive = (path: string) => location.pathname === path;
 
@@ -99,12 +99,13 @@ const Sidebar: React.FC<SidebarProps> = ({ open }) => {
       }
     >
       <nav className="p-2 md:p-3 space-y-2">
-        {item(isUnderwriter ? "/underwriter" : "/dashboard", "Dashboard", <BarChart3 className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter" : "/dashboard"))}
-        {item("/vehicles", "Vehicles", <Car className="h-5 w-5" />, isActive("/vehicles"))}
-        {item("/policies", "Policies", <FileText className="h-5 w-5" />, isActive("/policies"))}
-        {item("/inbox", "Inbox", <Inbox className="h-5 w-5" />, isActive("/inbox"))}
-        {item("/claims", "Claim List", <FileText className="h-5 w-5" />, isActive("/claims"))}
-        {item("/claims/create", "Claim Intimation", <AlertTriangle className="h-5 w-5" />, isActive("/claims/create"))}
+        {item(isUnderwriter ? "/underwriter/dashboard" : "/dashboard", "Dashboard", <BarChart3 className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter/dashboard" : "/dashboard"))}
+        {item(isUnderwriter ? "/underwriter/vehicles" : "/vehicles", "Vehicles", <Car className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter/vehicles" : "/vehicles"))}
+        {item(isUnderwriter ? "/underwriter/policies" : "/policies", "Policies", <FileText className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter/policies" : "/policies"))}
+        {item(isUnderwriter ? "/underwriter/inbox" : "/inbox", "Inbox", <Inbox className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter/inbox" : "/inbox"))}
+        {item(isUnderwriter ? "/underwriter/claims" : "/claims", "Claim List", <FileText className="h-5 w-5" />, isActive(isUnderwriter ? "/underwriter/claims" : "/claims"))}
+        {!isUnderwriter && item("/claims/create", "Claim Intimation", <AlertTriangle className="h-5 w-5" />, isActive("/claims/create"))}
+        {isUnderwriter && item("/underwriter/quotes", "Quotes", <FileText className="h-5 w-5" />, isActive("/underwriter/quotes"))}
       </nav>
     </aside>
   );

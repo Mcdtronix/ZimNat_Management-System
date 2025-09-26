@@ -58,14 +58,14 @@ export default function ProtectedRoute({
       }
 
       // Redirect customers trying to access staff routes
-      if (isCustomer && (location.pathname.includes('/admin') || location.pathname.includes('/manage'))) {
+      if (isCustomer && (location.pathname.includes('/admin') || location.pathname.includes('/manage') || location.pathname.includes('/underwriter'))) {
         navigate('/dashboard', { replace: true });
         return;
       }
 
       // Redirect staff trying to access customer-only routes
       if (isStaff && location.pathname.includes('/apply')) {
-        navigate('/admin-dashboard', { replace: true });
+        navigate(getDashboardRoute(), { replace: true });
         return;
       }
     }

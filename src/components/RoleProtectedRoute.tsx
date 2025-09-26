@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getAuthToken } from "@/lib/api";
+import { getAuthToken, getUserPermissions } from "@/lib/api";
 
 interface RoleProtectedRouteProps {
   children: ReactNode;
@@ -9,7 +9,13 @@ interface RoleProtectedRouteProps {
 }
 
 type Perms = {
-  user_type?: string;
+  user?: {
+    user_type?: string;
+    [k: string]: any;
+  };
+  permissions?: {
+    [k: string]: any;
+  };
   [k: string]: any;
 };
 
@@ -25,21 +31,12 @@ export default function RoleProtectedRoute({ children, requiredUserTypes, requir
       navigate("/login", { replace: true, state: { from: location } });
       return;
     }
-    const controller = new AbortController();
-    fetch("/api/user-permissions/", {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      signal: controller.signal,
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(await r.text());
-        return r.json();
+    
+    getUserPermissions()
+      .then((data) => {
+        setPerms(data);
       })
-      .then(setPerms)
       .catch((e) => setError(e?.message || "Failed to load permissions"));
-    return () => controller.abort();
   }, [navigate, location]);
 
   if (error) {
@@ -49,8 +46,16 @@ export default function RoleProtectedRoute({ children, requiredUserTypes, requir
     return <div className="p-6 text-sm text-muted-foreground">Loading permissions...</div>;
   }
 
-  const hasUserType = !requiredUserTypes || requiredUserTypes.includes(perms.user_type);
-  const hasPerms = !requiredPermissions || requiredPermissions.every((k) => !!perms[k]);
+  const userType = perms?.user?.user_type;
+  const hasUserType = !requiredUserTypes || (userType && requiredUserTypes.includes(userType));
+  const hasPerms = !requiredPermissions || requiredPermissions.every((k) => !!perms?.permissions?.[k]);
+
+  console.log("RoleProtectedRoute - Permissions data:", perms);
+  console.log("RoleProtectedRoute - User type:", userType);
+  console.log("RoleProtectedRoute - Required user types:", requiredUserTypes);
+  console.log("RoleProtectedRoute - Has user type:", hasUserType);
+  console.log("RoleProtectedRoute - Required permissions:", requiredPermissions);
+  console.log("RoleProtectedRoute - Has permissions:", hasPerms);
 
   if (!hasUserType || !hasPerms) {
     return (

@@ -1,5 +1,5 @@
 // Centralized API client for the frontend
-// Uses Vite env var VITE_BACKEND_URL, defaulting to http://localhost:8000
+// Uses Vite env var VITE_BACKEND_URL, defaulting to https://zimnat.pythonanywhere.com/ 
 
 export const API_BASE = "https://zimnat.pythonanywhere.com/";
 

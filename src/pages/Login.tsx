@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { getAuthToken } from "@/lib/api";
+import { getAuthToken, getUserPermissions } from "@/lib/api";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -22,23 +22,11 @@ const Login = () => {
       toast({ title: "Login Successful", description: "Welcome back!" });
       // Fetch permissions to route user to the appropriate dashboard
       try {
-        const token = getAuthToken();
-        const res = await fetch("/api/user-permissions/", {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        if (res.ok) {
-          const perms = await res.json();
-          const userType = perms?.user_type;
-          if (userType === "underwriter" || userType === "manager") {
-            navigate("/underwriter", { replace: true });
-          } else {
-            navigate("/dashboard", { replace: true });
-          }
+        const perms = await getUserPermissions();
+        const userType = perms?.user?.user_type;
+        if (userType === "underwriter" || userType === "manager") {
+          navigate("/underwriter/dashboard", { replace: true });
         } else {
-          // Fallback to default dashboard on failure
           navigate("/dashboard", { replace: true });
         }
       } catch {

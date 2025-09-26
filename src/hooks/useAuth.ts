@@ -89,6 +89,10 @@ export function useAuth() {
   // Get appropriate dashboard route
   const getDashboardRoute = () => {
     if (!authUser) return '/dashboard';
+    // Override the backend route for underwriters to use the new path
+    if (authUser.user?.user_type === 'underwriter' || authUser.user?.user_type === 'manager') {
+      return '/underwriter/dashboard';
+    }
     return authUser.dashboard_route;
   };
 
