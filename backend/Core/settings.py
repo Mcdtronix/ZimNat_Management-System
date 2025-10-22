@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import timedelta
 import os
 from decouple import config
+import stripe
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -218,7 +219,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:8080',
     'http://127.0.0.1:8080',
     # Production URLs - commented out for local development
-    'https://zimnat.pythonanywhere.com',
+    'http://localhost:8000',
     'https://zim-nat-management-system.vercel.app',
 ]
 CORS_ALLOW_CREDENTIALS = True
@@ -231,7 +232,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8080',
     'http://127.0.0.1:8080',
     # Production URLs - commented out for local development
-    'https://zimnat.pythonanywhere.com',
+    'http://localhost:8000',
     'https://zim-nat-management-system.vercel.app',
 ]
 
@@ -254,3 +255,11 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
+
+# Stripe Configuration
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', 'pk_test_51S56nlC4JPnk6JAKZDUUh8Hxx22eZKZJef90LQtSRBYlj0OYHYSfgsxxF7LieM0fcozghPw12N7LlnyjmEtMw4nv005l17hvwr')
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', 'sk_test_51S56nlC4JPnk6JAKPazekul0IQw20SjRpMurgAEWSMkldm4t3st9C5lkxunjQ3YUtvz6UQ4d8Xw56xbfSm1ztL1200dcBnlfwC')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', 'whsec_JphCuYJwcVNQFNPnSh0QNgGPrCoYBuX2')
+
+# Initialize Stripe
+stripe.api_key = STRIPE_SECRET_KEY

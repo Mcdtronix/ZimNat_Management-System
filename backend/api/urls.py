@@ -39,6 +39,12 @@ from .views import (
     EmailTokenObtainPairView,
     password_reset_request,
     password_reset_confirm,
+    create_payment_intent,
+    confirm_payment,
+    stripe_webhook,
+    get_payments,
+    verify_payment,
+    reject_payment,
 )
 
 router = DefaultRouter()
@@ -87,6 +93,16 @@ urlpatterns = [
     path('api/claims/<int:claim_id>/status/', update_claim_status, name='update_claim_status'),
     path('api/dashboard/data/', dashboard_data, name='dashboard_data'),
     path('api/claims/data/', claims_data, name='claims_data'),
+
+    # Stripe Payment endpoints
+    path('api/payments/create-payment-intent/', create_payment_intent, name='create_payment_intent'),
+    path('api/payments/confirm/', confirm_payment, name='confirm_payment'),
+    path('api/stripe/webhook/', stripe_webhook, name='stripe_webhook'),
+    
+    # Payment management endpoints
+    path('api/payments/', get_payments, name='get_payments'),
+    path('api/payments/<str:payment_id>/verify/', verify_payment, name='verify_payment'),
+    path('api/payments/<str:payment_id>/reject/', reject_payment, name='reject_payment'),
 
     # DRF router
     path('api/', include(router.urls))

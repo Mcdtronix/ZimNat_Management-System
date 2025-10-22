@@ -18,6 +18,10 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.views.generic import TemplateView
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from django.http import HttpResponse
+import stripe
 from datetime import timedelta
 from django.conf import settings
 from django.http import JsonResponse
@@ -29,7 +33,7 @@ from rest_framework import serializers as rf_serializers
 
 from .models import (
     User, Customer, Vehicle, VehicleCategory, InsuranceCoverage,
-    InsurancePolicy, Claim, ClaimDocument, ContactInquiry,
+    InsurancePolicy, Claim, ClaimDocument, ClaimApproval, ContactInquiry,
     DashboardStats, Payment, Notification, Quotation, TwoFactorCode
 )
 from .serializers import (
@@ -770,6 +774,256 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 return Payment.objects.none()
         return super().get_queryset()
 
+# Stripe Payment Views
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_payment_intent(request):
+    """Create a Stripe payment intent for a policy payment"""
+    try:
+        amount = request.data.get('amount')  # Amount in cents
+        policy_id = request.data.get('policy_id')
+        currency = request.data.get('currency', 'usd')
+        
+        # Get the policy
+        try:
+            policy = InsurancePolicy.objects.get(id=policy_id)
+        except InsurancePolicy.DoesNotExist:
+            return Response({'error': 'Policy not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Verify user has access to this policy
+        if request.user.user_type == 'customer':
+            if policy.customer.user != request.user:
+                return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Create payment intent with Stripe
+        intent = stripe.PaymentIntent.create(
+            amount=amount,
+            currency=currency,
+            metadata={
+                'policy_id': policy_id,
+                'user_id': request.user.id,
+                'policy_number': policy.policy_number,
+            },
+            automatic_payment_methods={
+                'enabled': True,
+            },
+        )
+        
+        return Response({
+            'client_secret': intent.client_secret,
+            'payment_intent_id': intent.id,
+        })
+        
+    except stripe.error.StripeError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def confirm_payment(request):
+    """Confirm a successful Stripe payment"""
+    try:
+        payment_intent_id = request.data.get('payment_intent_id')
+        policy_id = request.data.get('policy_id')
+        
+        # Retrieve payment intent from Stripe
+        intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+        
+        if intent.status != 'succeeded':
+            return Response({'error': 'Payment not completed'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the policy
+        try:
+            policy = InsurancePolicy.objects.get(id=policy_id)
+        except InsurancePolicy.DoesNotExist:
+            return Response({'error': 'Policy not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Verify user has access to this policy
+        if request.user.user_type == 'customer':
+            if policy.customer.user != request.user:
+                return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Check if payment already exists
+        existing_payment = Payment.objects.filter(transaction_reference=intent.id).first()
+        if existing_payment:
+            return Response({
+                'message': 'Payment already confirmed',
+                'payment_id': existing_payment.payment_id,
+            })
+        
+        # Create payment record
+        payment = Payment.objects.create(
+            policy=policy,
+            amount=Decimal(intent.amount) / 100,  # Convert from cents
+            payment_method='credit_card',
+            status='completed',
+            transaction_reference=intent.id,
+        )
+        
+        # Update policy status
+        policy.status = 'active'
+        policy.save()
+        
+        # Send notification
+        Notification.objects.create(
+            recipient=policy.customer.user,
+            title='Payment Successful',
+            message=f'Your payment for policy {policy.policy_number} has been processed successfully.',
+            type='payment_success',
+            payload={'payment_id': payment.payment_id, 'policy_id': policy.id}
+        )
+        
+        return Response({
+            'message': 'Payment confirmed successfully',
+            'payment_id': payment.payment_id,
+        })
+        
+    except stripe.error.StripeError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_payments(request):
+    """Get all payments with optional filtering"""
+    try:
+        # Only underwriters and managers can view all payments
+        if request.user.user_type not in ['underwriter', 'manager']:
+            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        payments = Payment.objects.select_related('policy__customer__user', 'verified_by').all()
+        
+        # Apply filters
+        status_filter = request.GET.get('status')
+        if status_filter:
+            payments = payments.filter(status=status_filter)
+        
+        payment_method_filter = request.GET.get('payment_method')
+        if payment_method_filter:
+            payments = payments.filter(payment_method=payment_method_filter)
+        
+        # Serialize payments
+        payments_data = []
+        for payment in payments:
+            payments_data.append({
+                'id': payment.id,
+                'payment_id': payment.payment_id,
+                'policy_id': payment.policy.id,
+                'policy_number': payment.policy.policy_number,
+                'customer_name': payment.policy.customer.user.get_full_name() or payment.policy.customer.user.username,
+                'customer_email': payment.policy.customer.user.email,
+                'amount': str(payment.amount),
+                'payment_method': payment.payment_method,
+                'status': payment.status,
+                'transaction_reference': payment.transaction_reference,
+                'payment_proof': payment.payment_proof.url if payment.payment_proof else None,
+                'payment_date': payment.payment_date.isoformat(),
+                'verified_by': payment.verified_by.get_full_name() if payment.verified_by else None,
+                'verified_at': payment.verified_at.isoformat() if payment.verified_at else None,
+            })
+        
+        return Response(payments_data)
+        
+    except Exception as e:
+        return Response({'error': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_payment(request, payment_id):
+    """Verify a bank transfer payment by uploading proof and updating status"""
+    try:
+        # Only underwriters and managers can verify payments
+        if request.user.user_type not in ['underwriter', 'manager']:
+            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            payment = Payment.objects.get(payment_id=payment_id)
+        except Payment.DoesNotExist:
+            return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if payment is already verified
+        if payment.status == 'completed':
+            return Response({'error': 'Payment is already verified'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the uploaded file
+        payment_proof = request.FILES.get('payment_proof')
+        if not payment_proof:
+            return Response({'error': 'Payment proof file is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update payment
+        payment.payment_proof = payment_proof
+        payment.status = 'completed'
+        payment.verified_by = request.user
+        payment.verified_at = timezone.now()
+        payment.save()
+        
+        # Update policy status if not already active
+        if payment.policy.status != 'active':
+            payment.policy.status = 'active'
+            payment.policy.save()
+        
+        # Send notification to customer
+        Notification.objects.create(
+            recipient=payment.policy.customer.user,
+            title='Payment Verified',
+            message=f'Your bank transfer payment for policy {payment.policy.policy_number} has been verified and processed successfully.',
+            type='payment_success',
+            payload={'payment_id': payment.payment_id, 'policy_id': payment.policy.id}
+        )
+        
+        return Response({
+            'message': 'Payment verified successfully',
+            'payment_id': payment.payment_id,
+            'status': payment.status
+        })
+        
+    except Exception as e:
+        return Response({'error': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reject_payment(request, payment_id):
+    """Reject a payment (mark as failed)"""
+    try:
+        # Only underwriters and managers can reject payments
+        if request.user.user_type not in ['underwriter', 'manager']:
+            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            payment = Payment.objects.get(payment_id=payment_id)
+        except Payment.DoesNotExist:
+            return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if payment is already processed
+        if payment.status in ['completed', 'failed']:
+            return Response({'error': f'Payment is already {payment.status}'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update payment status
+        payment.status = 'failed'
+        payment.verified_by = request.user
+        payment.verified_at = timezone.now()
+        payment.save()
+        
+        # Send notification to customer
+        Notification.objects.create(
+            recipient=payment.policy.customer.user,
+            title='Payment Rejected',
+            message=f'Your payment for policy {payment.policy.policy_number} has been rejected. Please contact support for assistance.',
+            type='status_update',
+            payload={'payment_id': payment.payment_id, 'policy_id': payment.policy.id, 'status': 'rejected'}
+        )
+        
+        return Response({
+            'message': 'Payment rejected successfully',
+            'payment_id': payment.payment_id,
+            'status': payment.status
+        })
+        
+    except Exception as e:
+        return Response({'error': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 # Contact/Inquiry Views
 @extend_schema_view(list=extend_schema(tags=['contact-inquiries']), retrieve=extend_schema(tags=['contact-inquiries']), create=extend_schema(tags=['contact-inquiries']), update=extend_schema(tags=['contact-inquiries']), partial_update=extend_schema(tags=['contact-inquiries']), destroy=extend_schema(tags=['contact-inquiries']))
 class ContactInquiryViewSet(viewsets.ModelViewSet):
@@ -857,30 +1111,70 @@ class ClaimViewSet(viewsets.ModelViewSet):
         claim = self.get_object()
         action = request.data.get('action')
         approved_amount = request.data.get('approved_amount')
+        notes = request.data.get('notes', '')
+        rejection_reason = request.data.get('rejection_reason', '')
+        priority = request.data.get('priority', claim.priority)
+        requires_investigation = request.data.get('requires_investigation', False)
+        investigation_notes = request.data.get('investigation_notes', '')
+        
         # Only underwriters/managers can process
         if request.user.user_type not in ['underwriter', 'manager']:
             raise permissions.PermissionDenied('Only underwriters or managers can process claims.')
+        
         # Only pending approvals can be processed
         if claim.approval_status != 'pending':
             return Response({'success': False, 'error': 'Only pending claims can be processed.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if action not in ['approve', 'reject']:
+        if action not in ['approve', 'reject', 'investigate', 'under_review']:
             return Response({'success': False, 'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Update claim fields
+        claim.priority = priority
+        claim.approval_notes = notes
+        claim.requires_investigation = requires_investigation
+        claim.investigation_notes = investigation_notes
+        claim.processed_by = request.user
+        claim.processed_at = timezone.now()
+
         if action == 'approve':
-            claim.approval_status = 'approve'
-            claim.status = 'approved'
             if approved_amount is not None:
                 try:
                     claim.approved_amount = Decimal(str(approved_amount))
                 except Exception:
                     return Response({'success': False, 'error': 'approved_amount must be a decimal'}, status=status.HTTP_400_BAD_REQUEST)
-        else:
+            else:
+                claim.approved_amount = claim.estimated_amount
+            
+            claim.approval_status = 'approve'
+            claim.status = 'approved'
+            
+        elif action == 'reject':
+            if not rejection_reason:
+                return Response({'success': False, 'error': 'Rejection reason is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
             claim.approval_status = 'reject'
             claim.status = 'rejected'
+            claim.rejection_reason = rejection_reason
+            
+        elif action == 'investigate':
+            claim.status = 'under_review'
+            claim.requires_investigation = True
+            claim.investigation_notes = investigation_notes
+            
+        elif action == 'under_review':
+            claim.status = 'under_review'
 
-        claim.processed_by = request.user
         claim.save()
+
+        # Create approval history record
+        ClaimApproval.objects.create(
+            claim=claim,
+            action=action,
+            performed_by=request.user,
+            notes=notes,
+            approved_amount=claim.approved_amount,
+            rejection_reason=rejection_reason if action == 'reject' else None
+        )
 
         # Notify customer on status change
         Notification.objects.create(
@@ -888,15 +1182,48 @@ class ClaimViewSet(viewsets.ModelViewSet):
             title='Claim status updated',
             message=f'Your claim {claim.claim_id} is now {claim.status}.',
             type='status_update',
-            payload={'claim_id': claim.id, 'claim_ref': claim.claim_id, 'status': claim.status}
+            payload={
+                'claim_id': claim.id, 
+                'claim_ref': claim.claim_id, 
+                'status': claim.status,
+                'approved_amount': str(claim.approved_amount) if claim.approved_amount else None,
+                'rejection_reason': claim.rejection_reason
+            }
         )
 
         return Response({
             'success': True,
             'message': f'Claim {action}d successfully',
             'claim_id': claim.claim_id,
-            'status': claim.approval_status
+            'status': claim.approval_status,
+            'approved_amount': str(claim.approved_amount) if claim.approved_amount else None
         })
+
+    @action(detail=True, methods=['get'])
+    def approval_history(self, request, pk=None):
+        """Get approval history for a claim"""
+        claim = self.get_object()
+        
+        # Only underwriters/managers can view approval history
+        if request.user.user_type not in ['underwriter', 'manager']:
+            raise permissions.PermissionDenied('Only underwriters or managers can view approval history.')
+        
+        history = ClaimApproval.objects.filter(claim=claim).select_related('performed_by')
+        
+        history_data = []
+        for record in history:
+            history_data.append({
+                'id': record.id,
+                'action': record.action,
+                'performed_by': record.performed_by.get_full_name() if record.performed_by else 'System',
+                'performed_by_email': record.performed_by.email if record.performed_by else None,
+                'notes': record.notes,
+                'approved_amount': str(record.approved_amount) if record.approved_amount else None,
+                'rejection_reason': record.rejection_reason,
+                'created_at': record.created_at.isoformat(),
+            })
+        
+        return Response(history_data)
 
     @action(detail=True, methods=['post'])
     def assessor_message(self, request, pk=None):
@@ -1944,3 +2271,112 @@ def password_reset_confirm(request):
     user.set_password(new_password)
     user.save()
     return Response({"message": "Password has been reset successfully."})
+
+# Stripe Webhook Handler
+@csrf_exempt
+@require_POST
+def stripe_webhook(request):
+    """Handle Stripe webhook events"""
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError:
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError:
+        return HttpResponse(status=400)
+    
+    # Handle the event
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        handle_payment_succeeded(payment_intent)
+    elif event['type'] == 'payment_intent.payment_failed':
+        payment_intent = event['data']['object']
+        handle_payment_failed(payment_intent)
+    
+    return HttpResponse(status=200)
+
+def handle_payment_succeeded(payment_intent):
+    """Handle successful payment webhook"""
+    policy_id = payment_intent['metadata'].get('policy_id')
+    if policy_id:
+        try:
+            policy = InsurancePolicy.objects.get(id=policy_id)
+            
+            # Check if payment already exists
+            existing_payment = Payment.objects.filter(transaction_reference=payment_intent['id']).first()
+            if existing_payment:
+                return  # Payment already processed
+            
+            # Create payment record
+            payment = Payment.objects.create(
+                policy=policy,
+                amount=Decimal(payment_intent['amount']) / 100,
+                payment_method='credit_card',
+                status='completed',
+                transaction_reference=payment_intent['id'],
+            )
+            
+            # Update policy status if not already active
+            if policy.status != 'active':
+                policy.status = 'active'
+                policy.save()
+                
+                # Send notification to customer
+                Notification.objects.create(
+                    recipient=policy.customer.user,
+                    title='Payment Successful',
+                    message=f'Your payment for policy {policy.policy_number} has been processed successfully.',
+                    type='payment_success',
+                    payload={'payment_id': payment.payment_id, 'policy_id': policy.id}
+                )
+                
+                # Send notification to underwriters
+                underwriters = User.objects.filter(user_type__in=['underwriter', 'manager'])
+                for underwriter in underwriters:
+                    Notification.objects.create(
+                        recipient=underwriter,
+                        title='Payment Received',
+                        message=f'Payment received for policy {policy.policy_number} from {policy.customer.user.get_full_name() or policy.customer.user.username}.',
+                        type='payment_success',
+                        payload={
+                            'payment_id': payment.payment_id, 
+                            'policy_id': policy.id,
+                            'policy_number': policy.policy_number,
+                            'customer_name': policy.customer.user.get_full_name() or policy.customer.user.username,
+                            'amount': str(payment.amount),
+                            'payment_method': payment.payment_method
+                        }
+                    )
+        except InsurancePolicy.DoesNotExist:
+            pass
+
+def handle_payment_failed(payment_intent):
+    """Handle failed payment webhook"""
+    policy_id = payment_intent['metadata'].get('policy_id')
+    if policy_id:
+        try:
+            policy = InsurancePolicy.objects.get(id=policy_id)
+            
+            # Create failed payment record
+            Payment.objects.create(
+                policy=policy,
+                amount=Decimal(payment_intent['amount']) / 100,
+                payment_method='credit_card',
+                status='failed',
+                transaction_reference=payment_intent['id'],
+            )
+            
+            # Send notification
+            Notification.objects.create(
+                recipient=policy.customer.user,
+                title='Payment Failed',
+                message=f'Your payment for policy {policy.policy_number} could not be processed. Please try again.',
+                type='payment_failed',
+                payload={'payment_id': payment_intent['id'], 'policy_id': policy.id}
+            )
+        except InsurancePolicy.DoesNotExist:
+            pass

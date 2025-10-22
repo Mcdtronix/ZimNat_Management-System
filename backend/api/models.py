@@ -175,6 +175,13 @@ class Claim(models.Model):
         ('reject', 'Rejected'),
     ]
     
+    PRIORITY_LEVELS = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    ]
+    
     claim_id = models.CharField(max_length=20, unique=True)
     policy = models.ForeignKey(InsurancePolicy, on_delete=models.CASCADE, related_name='claims')
     incident_date = models.DateField()
@@ -184,7 +191,13 @@ class Claim(models.Model):
     approved_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=CLAIM_STATUS, default='submitted')
     approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS, default='pending')
+    priority = models.CharField(max_length=10, choices=PRIORITY_LEVELS, default='medium')
     processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='processed_claims')
+    processed_at = models.DateTimeField(null=True, blank=True)
+    approval_notes = models.TextField(blank=True, null=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    requires_investigation = models.BooleanField(default=False)
+    investigation_notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -195,6 +208,32 @@ class Claim(models.Model):
     
     def __str__(self):
         return f"Claim {self.claim_id} - {self.policy.policy_number}"
+
+class ClaimApproval(models.Model):
+    """Track claim approval history and decisions"""
+    APPROVAL_ACTIONS = [
+        ('submitted', 'Submitted'),
+        ('under_review', 'Under Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('requires_investigation', 'Requires Investigation'),
+        ('investigation_complete', 'Investigation Complete'),
+        ('settled', 'Settled'),
+    ]
+    
+    claim = models.ForeignKey(Claim, on_delete=models.CASCADE, related_name='approval_history')
+    action = models.CharField(max_length=30, choices=APPROVAL_ACTIONS)
+    performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    approved_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.claim.claim_id} - {self.action} by {self.performed_by}"
 
 class ClaimDocument(models.Model):
     claim = models.ForeignKey(Claim, on_delete=models.CASCADE, related_name='documents')
@@ -269,8 +308,11 @@ class Payment(models.Model):
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD)
     status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending')
     transaction_reference = models.CharField(max_length=100, blank=True)
+    payment_proof = models.FileField(upload_to='payment_proofs/', null=True, blank=True)
     payment_date = models.DateTimeField(auto_now_add=True)
     due_date = models.DateField(null=True, blank=True)
+    verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_payments')
+    verified_at = models.DateTimeField(null=True, blank=True)
     
     def save(self, *args, **kwargs):
         if not self.payment_id:
@@ -285,6 +327,9 @@ class Notification(models.Model):
         ('quotation', 'Quotation'),
         ('status_update', 'Status Update'),
         ('message', 'Message'),
+        ('payment_success', 'Payment Success'),
+        ('payment_verification', 'Payment Verification'),
+        ('policy_application', 'Policy Application'),
     ]
 
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
