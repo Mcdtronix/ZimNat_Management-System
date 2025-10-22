@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       '/api': {
-        target: 'https://zimnat.pythonanywhere.com/',
+        target: 'http://localhost:8000',
         changeOrigin: true,
       },
     }, 

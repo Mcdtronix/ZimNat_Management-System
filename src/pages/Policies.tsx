@@ -1,27 +1,104 @@
-import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getAuthToken } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { getAuthToken, apiFetch } from "@/lib/api";
+import { Link } from "react-router-dom";
+import {
+  Search,
+  Filter,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
+  Plus,
+  Shield,
+  Users,
+  FileText,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  BarChart3,
+  PieChart,
+  Activity,
+  Settings,
+  RefreshCw,
+  Calendar,
+  DollarSign,
+  Car,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  LineChart,
+  Line,
+} from "recharts";
 
 interface Policy {
   id: number;
   policy_number: string;
-  vehicle: number;
-  coverage: number;
+  vehicle: number | Vehicle;
+  customer: number | Customer;
+  coverage: number | Coverage;
   premium_amount?: string;
   coverage_amount?: string;
   start_date?: string;
   end_date?: string;
-  status: "pending" | "active" | "cancelled" | string;
+  status: "pending" | "active" | "cancelled" | "expired" | string;
+  created_at: string;
 }
 
-interface VehicleCategory { id: number; name: string; }
-interface Vehicle { id: number; vehicle_number: string; category: number; }
-interface Coverage { id: number; name: string; }
+interface VehicleCategory { 
+  id: number; 
+  name: string; 
+  display_name?: string;
+  description?: string;
+}
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://zimnat.pythonanywhere.com/";
+interface Customer {
+  id: number;
+  customer_id: string;
+  user: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+interface Vehicle { 
+  id: number; 
+  vehicle_number: string; 
+  category: number | VehicleCategory;
+  make: string;
+  model: string;
+  year: number;
+}
+
+interface Coverage { 
+  id: number; 
+  name: string; 
+  description?: string;
+}
+
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 const api = async (path: string) => {
   const token = getAuthToken();

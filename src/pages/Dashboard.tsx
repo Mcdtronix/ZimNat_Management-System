@@ -40,7 +40,7 @@ type ClaimsList = {
   }>;
 };
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://zimnat.pythonanywhere.com/";
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 const api = async (path: string) => {
   const token = getAuthToken();

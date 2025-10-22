@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { StripeProvider } from "@/contexts/StripeContext";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
@@ -20,6 +21,9 @@ import Claims from "./pages/Claims";
 import NotFound from "./pages/NotFound";
 import Vehicles from "./pages/Vehicles";
 import Policies from "./pages/Policies";
+import UnderwriterPolicies from "./pages/UnderwriterPolicies";
+import UnderwriterClaims from "./pages/UnderwriterClaims";
+import UnderwriterPayments from "./pages/UnderwriterPayments";
 import ApplyPolicy from "./pages/ApplyPolicy";
 import Inbox from "./pages/Inbox";
 import CreateClaim from "./pages/CreateClaim";
@@ -37,9 +41,10 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+      <StripeProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout hideSidebar><Home /></Layout>} />
           <Route path="/about" element={<Layout hideSidebar><About /></Layout>} />
@@ -126,7 +131,7 @@ const App = () => (
             element={
               <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_process_claims"]}>
                 <Layout>
-                  <Claims />
+                  <UnderwriterClaims />
                 </Layout>
               </RoleProtectedRoute>
             }
@@ -146,7 +151,17 @@ const App = () => (
             element={
               <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_manage_customers"]}>
                 <Layout>
-                  <Policies />
+                  <UnderwriterPolicies />
+                </Layout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/underwriter/payments"
+            element={
+              <RoleProtectedRoute requiredUserTypes={["underwriter", "manager"]} requiredPermissions={["can_manage_customers"]}>
+                <Layout>
+                  <UnderwriterPayments />
                 </Layout>
               </RoleProtectedRoute>
             }
@@ -222,7 +237,8 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<Layout><NotFound /></Layout>} />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </StripeProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

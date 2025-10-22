@@ -107,7 +107,7 @@ const Register = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="nic">NIC:</Label>
+                    <Label htmlFor="nic">National ID:</Label>
                     <Input
                       id="nic"
                       name="nic"

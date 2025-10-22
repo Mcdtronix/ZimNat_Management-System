@@ -23,7 +23,7 @@ function normalizeList<T = any>(data: any): T[] {
   return [];
 }
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://zimnat.pythonanywhere.com/";
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 const api = async (path: string, init?: RequestInit) => {
   const token = getAuthToken();

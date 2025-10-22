@@ -1,7 +1,8 @@
 // Centralized API client for the frontend
-// Uses Vite env var VITE_BACKEND_URL, defaulting to https://zimnat.pythonanywhere.com/ 
+// Uses Vite env var VITE_BACKEND_URL, defaulting to https://localhost:8000 
 
-export const API_BASE = "https://zimnat.pythonanywhere.com";
+// Use relative path in production (Vercel proxy), absolute path in development
+export const API_BASE = import.meta.env.PROD ? "/api" : "http://localhost:8000";
 
 export function getAuthToken() {
   return localStorage.getItem("access_token");
@@ -167,4 +168,91 @@ export function confirmPasswordReset(payload: { uidb64: string; token: string; n
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// Payment API functions
+export function createPaymentIntent(payload: {
+  amount: number;
+  policy_id: string;
+  currency: string;
+}) {
+  return apiFetch<{ client_secret: string; payment_intent_id: string }>("/api/payments/create-payment-intent/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function confirmPayment(payload: {
+  payment_intent_id: string;
+  policy_id: string;
+}) {
+  return apiFetch<{ message: string; payment_id: string }>("/api/payments/confirm/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getPayments(filters?: {
+  status?: string;
+  payment_method?: string;
+  policy?: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters?.status) params.append('status', filters.status);
+  if (filters?.payment_method) params.append('payment_method', filters.payment_method);
+  if (filters?.policy) params.append('policy', filters.policy);
+  
+  const queryString = params.toString();
+  return apiFetch(`/api/payments/${queryString ? `?${queryString}` : ''}`);
+}
+
+export function getPaymentById(paymentId: string) {
+  return apiFetch(`/api/payments/${paymentId}/`);
+}
+
+export function getAllPayments(filters?: {
+  status?: string;
+  payment_method?: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters?.status) params.append('status', filters.status);
+  if (filters?.payment_method) params.append('payment_method', filters.payment_method);
+  
+  const queryString = params.toString();
+  return apiFetch(`/api/payments/${queryString ? `?${queryString}` : ''}`);
+}
+
+export function verifyPayment(paymentId: string, paymentProof: File) {
+  const formData = new FormData();
+  formData.append('payment_proof', paymentProof);
+  
+  return apiFetch(`/api/payments/${paymentId}/verify/`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export function rejectPayment(paymentId: string) {
+  return apiFetch(`/api/payments/${paymentId}/reject/`, {
+    method: 'POST',
+  });
+}
+
+export function processClaim(claimId: number, data: {
+  action: 'approve' | 'reject' | 'investigate' | 'under_review';
+  approved_amount?: string;
+  notes?: string;
+  rejection_reason?: string;
+  priority?: string;
+  requires_investigation?: boolean;
+  investigation_notes?: string;
+}) {
+  return apiFetch(`/api/claims/${claimId}/process_claim/`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function getClaimApprovalHistory(claimId: number) {
+  return apiFetch(`/api/claims/${claimId}/approval_history/`);
 }
