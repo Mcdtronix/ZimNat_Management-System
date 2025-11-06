@@ -1,5 +1,5 @@
 // Centralized API client for the frontend
-// Uses Vite env var VITE_BACKEND_URL, defaulting to https://localhost:8000 
+// Uses Vite env var VITE_BACKEND_URL, defaulting to https://localhost:8000
 
 // Use relative path in production (Vercel proxy), absolute path in development
 export const API_BASE = import.meta.env.PROD ? "/api" : "http://localhost:8000";
@@ -24,7 +24,9 @@ export function clearAuthTokens() {
 // Optional: global logout notifier for consumers to hook into (e.g., redirect to login)
 function notifyGlobalLogout(reason: string) {
   try {
-    window.dispatchEvent(new CustomEvent("auth:logout", { detail: { reason } }));
+    window.dispatchEvent(
+      new CustomEvent("auth:logout", { detail: { reason } })
+    );
   } catch {
     // no-op if CustomEvent isn't supported
   }
@@ -63,7 +65,10 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-export async function apiFetch<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T = any>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
   const token = getAuthToken();
   const headers: HeadersInit = {
     "Content-Type": "application/json",
@@ -76,7 +81,9 @@ export async function apiFetch<T = any>(path: string, options: RequestInit = {})
     headers,
   });
 
-  const isJson = (res.headers.get("content-type") || "").includes("application/json");
+  const isJson = (res.headers.get("content-type") || "").includes(
+    "application/json"
+  );
   let data = isJson ? await res.json() : undefined;
 
   if (!res.ok) {
@@ -88,8 +95,13 @@ export async function apiFetch<T = any>(path: string, options: RequestInit = {})
           ...headers,
           Authorization: `Bearer ${newAccess}`,
         };
-        res = await fetch(`${API_BASE}${path}`, { ...options, headers: retryHeaders });
-        const retryIsJson = (res.headers.get("content-type") || "").includes("application/json");
+        res = await fetch(`${API_BASE}${path}`, {
+          ...options,
+          headers: retryHeaders,
+        });
+        const retryIsJson = (res.headers.get("content-type") || "").includes(
+          "application/json"
+        );
         data = retryIsJson ? await res.json() : undefined;
         if (res.ok) {
           return data as T;
@@ -101,7 +113,9 @@ export async function apiFetch<T = any>(path: string, options: RequestInit = {})
       }
     }
     // Standardize error shape
-    const error = new Error((data && (data.detail || data.error)) || `Request failed: ${res.status}`) as any;
+    const error = new Error(
+      (data && (data.detail || data.error)) || `Request failed: ${res.status}`
+    ) as any;
     error.status = res.status;
     error.data = data;
     throw error;
@@ -131,13 +145,19 @@ export function registerApi(payload: {
   national_id?: string;
 }) {
   // Backend now returns message + user (no tokens) and optional otp_hint in DEBUG
-  return apiFetch<{ message: string; user: any; otp_hint?: string }>("/api/auth/register/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return apiFetch<{ message: string; user: any; otp_hint?: string }>(
+    "/api/auth/register/",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
-export function verifyRegistrationOtp(payload: { email: string; code: string }) {
+export function verifyRegistrationOtp(payload: {
+  email: string;
+  code: string;
+}) {
   return apiFetch<{ message: string }>("/api/auth/verify-otp/", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -145,10 +165,13 @@ export function verifyRegistrationOtp(payload: { email: string; code: string }) 
 }
 
 export function resendRegistrationOtp(payload: { email: string }) {
-  return apiFetch<{ message: string; otp_hint?: string }>("/api/auth/resend-otp/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return apiFetch<{ message: string; otp_hint?: string }>(
+    "/api/auth/resend-otp/",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export function getUserPermissions() {
@@ -163,7 +186,11 @@ export function requestPasswordReset(payload: { email: string }) {
   });
 }
 
-export function confirmPasswordReset(payload: { uidb64: string; token: string; new_password: string }) {
+export function confirmPasswordReset(payload: {
+  uidb64: string;
+  token: string;
+  new_password: string;
+}) {
   return apiFetch<{ message: string }>("/api/auth/password-reset-confirm/", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -176,20 +203,26 @@ export function createPaymentIntent(payload: {
   policy_id: string;
   currency: string;
 }) {
-  return apiFetch<{ client_secret: string; payment_intent_id: string }>("/api/payments/create-payment-intent/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return apiFetch<{ client_secret: string; payment_intent_id: string }>(
+    "/api/payments/create-payment-intent/",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export function confirmPayment(payload: {
   payment_intent_id: string;
   policy_id: string;
 }) {
-  return apiFetch<{ message: string; payment_id: string }>("/api/payments/confirm/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return apiFetch<{ message: string; payment_id: string }>(
+    "/api/payments/confirm/",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export function getPayments(filters?: {
@@ -198,12 +231,13 @@ export function getPayments(filters?: {
   policy?: string;
 }) {
   const params = new URLSearchParams();
-  if (filters?.status) params.append('status', filters.status);
-  if (filters?.payment_method) params.append('payment_method', filters.payment_method);
-  if (filters?.policy) params.append('policy', filters.policy);
-  
+  if (filters?.status) params.append("status", filters.status);
+  if (filters?.payment_method)
+    params.append("payment_method", filters.payment_method);
+  if (filters?.policy) params.append("policy", filters.policy);
+
   const queryString = params.toString();
-  return apiFetch(`/api/payments/${queryString ? `?${queryString}` : ''}`);
+  return apiFetch(`/api/payments/${queryString ? `?${queryString}` : ""}`);
 }
 
 export function getPaymentById(paymentId: string) {
@@ -215,40 +249,44 @@ export function getAllPayments(filters?: {
   payment_method?: string;
 }) {
   const params = new URLSearchParams();
-  if (filters?.status) params.append('status', filters.status);
-  if (filters?.payment_method) params.append('payment_method', filters.payment_method);
-  
+  if (filters?.status) params.append("status", filters.status);
+  if (filters?.payment_method)
+    params.append("payment_method", filters.payment_method);
+
   const queryString = params.toString();
-  return apiFetch(`/api/payments/${queryString ? `?${queryString}` : ''}`);
+  return apiFetch(`/api/payments/${queryString ? `?${queryString}` : ""}`);
 }
 
 export function verifyPayment(paymentId: string, paymentProof: File) {
   const formData = new FormData();
-  formData.append('payment_proof', paymentProof);
-  
+  formData.append("payment_proof", paymentProof);
+
   return apiFetch(`/api/payments/${paymentId}/verify/`, {
-    method: 'POST',
+    method: "POST",
     body: formData,
   });
 }
 
 export function rejectPayment(paymentId: string) {
   return apiFetch(`/api/payments/${paymentId}/reject/`, {
-    method: 'POST',
+    method: "POST",
   });
 }
 
-export function processClaim(claimId: number, data: {
-  action: 'approve' | 'reject' | 'investigate' | 'under_review';
-  approved_amount?: string;
-  notes?: string;
-  rejection_reason?: string;
-  priority?: string;
-  requires_investigation?: boolean;
-  investigation_notes?: string;
-}) {
+export function processClaim(
+  claimId: number,
+  data: {
+    action: "approve" | "reject" | "investigate" | "under_review";
+    approved_amount?: string;
+    notes?: string;
+    rejection_reason?: string;
+    priority?: string;
+    requires_investigation?: boolean;
+    investigation_notes?: string;
+  }
+) {
   return apiFetch(`/api/claims/${claimId}/process_claim/`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(data),
   });
 }
@@ -258,14 +296,22 @@ export function getClaimApprovalHistory(claimId: number) {
 }
 
 // Excel Export functions
-export async function exportToExcel(exportType: 'policies' | 'payments' | 'quotations' | 'claims' | 'vehicles' | 'dashboard') {
+export async function exportToExcel(
+  exportType:
+    | "policies"
+    | "payments"
+    | "quotations"
+    | "claims"
+    | "vehicles"
+    | "dashboard"
+) {
   const token = getAuthToken();
   const url = `${API_BASE}/api/export/${exportType}/`;
-  
+
   const response = await fetch(url, {
-    method: 'GET',
+    method: "GET",
     headers: {
-      'Authorization': token ? `Bearer ${token}` : '',
+      Authorization: token ? `Bearer ${token}` : "",
     },
   });
 
@@ -274,7 +320,7 @@ export async function exportToExcel(exportType: 'policies' | 'payments' | 'quota
   }
 
   // Get filename from Content-Disposition header or use default
-  const contentDisposition = response.headers.get('Content-Disposition');
+  const contentDisposition = response.headers.get("Content-Disposition");
   let filename = `${exportType}_export.xlsx`;
   if (contentDisposition) {
     const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
@@ -286,7 +332,7 @@ export async function exportToExcel(exportType: 'policies' | 'payments' | 'quota
   // Create blob and download
   const blob = await response.blob();
   const downloadUrl = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = downloadUrl;
   link.download = filename;
   document.body.appendChild(link);
@@ -297,25 +343,25 @@ export async function exportToExcel(exportType: 'policies' | 'payments' | 'quota
 
 // Convenience functions for each export type
 export function exportPolicies() {
-  return exportToExcel('policies');
+  return exportToExcel("policies");
 }
 
 export function exportPayments() {
-  return exportToExcel('payments');
+  return exportToExcel("payments");
 }
 
 export function exportQuotations() {
-  return exportToExcel('quotations');
+  return exportToExcel("quotations");
 }
 
 export function exportClaims() {
-  return exportToExcel('claims');
+  return exportToExcel("claims");
 }
 
 export function exportVehicles() {
-  return exportToExcel('vehicles');
+  return exportToExcel("vehicles");
 }
 
 export function exportDashboardReport() {
-  return exportToExcel('dashboard');
+  return exportToExcel("dashboard");
 }
