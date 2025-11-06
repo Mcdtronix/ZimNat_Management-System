@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { getAuthToken, apiFetch } from "@/lib/api";
+import { getAuthToken, apiFetch, exportPolicies } from "@/lib/api";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -119,6 +119,16 @@ export default function UnderwriterPolicies() {
   const [sortBy, setSortBy] = useState("latest");
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      await exportPolicies();
+      toast.success('Policies exported successfully');
+    } catch (error) {
+      console.error('Failed to export policies:', error);
+      toast.error('Failed to export policies. Please try again.');
+    }
+  };
 
   // Data fetching
   const { data: policies, isLoading: policiesLoading } = useQuery<Policy[]>({
@@ -322,7 +332,7 @@ export default function UnderwriterPolicies() {
             <p className="text-slate-600 mt-1">Comprehensive policy management and analytics</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="w-4 h-4 mr-2" />
               Export Data
             </Button>

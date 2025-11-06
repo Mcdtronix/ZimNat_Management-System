@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { getAllPayments, verifyPayment, rejectPayment } from "@/lib/api";
+import { getAllPayments, verifyPayment, rejectPayment, exportPayments } from "@/lib/api";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -86,6 +86,16 @@ export default function UnderwriterPayments() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+
+  const handleExport = async () => {
+    try {
+      await exportPayments();
+      toast.success('Payments exported successfully');
+    } catch (error) {
+      console.error('Failed to export payments:', error);
+      toast.error('Failed to export payments. Please try again.');
+    }
+  };
 
   // Data fetching
   const { data: paymentsRaw, isLoading } = useQuery<Payment[]>({
@@ -292,7 +302,7 @@ export default function UnderwriterPayments() {
             <p className="text-slate-600 mt-1">Manage and verify customer payments</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="w-4 h-4 mr-2" />
               Export Data
             </Button>

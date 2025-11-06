@@ -1640,6 +1640,426 @@ def generate_report(request):
         'generated_at': timezone.now(),
     })
 
+# Excel Export Views
+@extend_schema(tags=['exports'], summary='Export policies to Excel')
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_policies_excel(request):
+    """Export all policies to Excel format"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return Response({'error': "Excel export requires 'openpyxl'"}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    
+    policies = InsurancePolicy.objects.select_related('customer', 'vehicle', 'coverage').all()
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Policies'
+    
+    # Header row
+    headers = ['Policy Number', 'Customer', 'Vehicle Number', 'Make/Model', 'Year', 
+               'Coverage Type', 'Premium Amount', 'Coverage Amount', 'Start Date', 
+               'End Date', 'Status', 'Created At']
+    ws.append(headers)
+    
+    # Style header row
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Data rows
+    for policy in policies:
+        customer_name = f"{policy.customer.user.first_name} {policy.customer.user.last_name}".strip() or policy.customer.user.username
+        vehicle_info = f"{policy.vehicle.make} {policy.vehicle.model}"
+        ws.append([
+            policy.policy_number,
+            customer_name,
+            policy.vehicle.vehicle_number,
+            vehicle_info,
+            policy.vehicle.year,
+            policy.coverage.get_name_display(),
+            float(policy.premium_amount),
+            float(policy.coverage_amount),
+            policy.start_date.strftime('%Y-%m-%d'),
+            policy.end_date.strftime('%Y-%m-%d'),
+            policy.get_status_display(),
+            policy.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        ])
+    
+    # Auto-size columns
+    for col in ws.columns:
+        max_length = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            try:
+                max_length = max(max_length, len(str(cell.value or '')))
+            except:
+                pass
+        ws.column_dimensions[col_letter].width = min(max_length + 2, 50)
+    
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    resp = HttpResponse(stream.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="policies_export.xlsx"'
+    return resp
+
+@extend_schema(tags=['exports'], summary='Export payments to Excel')
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_payments_excel(request):
+    """Export all payments to Excel format"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return Response({'error': "Excel export requires 'openpyxl'"}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    
+    payments = Payment.objects.select_related('policy__customer', 'policy__vehicle', 'verified_by').all()
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Payments'
+    
+    headers = ['Payment ID', 'Policy Number', 'Customer', 'Vehicle Number', 
+               'Amount', 'Payment Method', 'Status', 'Transaction Reference', 
+               'Payment Date', 'Due Date', 'Verified By', 'Verified At']
+    ws.append(headers)
+    
+    # Style header
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    for payment in payments:
+        customer_name = f"{payment.policy.customer.user.first_name} {payment.policy.customer.user.last_name}".strip() or payment.policy.customer.user.username
+        verified_by = f"{payment.verified_by.first_name} {payment.verified_by.last_name}".strip() if payment.verified_by else ''
+        ws.append([
+            payment.payment_id,
+            payment.policy.policy_number,
+            customer_name,
+            payment.policy.vehicle.vehicle_number,
+            float(payment.amount),
+            payment.get_payment_method_display(),
+            payment.get_status_display(),
+            payment.transaction_reference or '',
+            payment.payment_date.strftime('%Y-%m-%d %H:%M:%S'),
+            payment.due_date.strftime('%Y-%m-%d') if payment.due_date else '',
+            verified_by,
+            payment.verified_at.strftime('%Y-%m-%d %H:%M:%S') if payment.verified_at else '',
+        ])
+    
+    # Auto-size columns
+    for col in ws.columns:
+        max_length = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            try:
+                max_length = max(max_length, len(str(cell.value or '')))
+            except:
+                pass
+        ws.column_dimensions[col_letter].width = min(max_length + 2, 50)
+    
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    resp = HttpResponse(stream.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="payments_export.xlsx"'
+    return resp
+
+@extend_schema(tags=['exports'], summary='Export quotations to Excel')
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_quotations_excel(request):
+    """Export all quotations to Excel format"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return Response({'error': "Excel export requires 'openpyxl'"}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    
+    quotations = Quotation.objects.select_related('policy__customer', 'policy__vehicle', 'created_by', 'decided_by').all()
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Quotations'
+    
+    headers = ['Quote ID', 'Policy Number', 'Customer', 'Vehicle Number', 
+               'Premium Amount', 'Coverage Amount', 'Currency', 'Status', 
+               'Created By', 'Created At', 'Decided By', 'Customer Decision At']
+    ws.append(headers)
+    
+    # Style header
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    for quote in quotations:
+        customer_name = f"{quote.policy.customer.user.first_name} {quote.policy.customer.user.last_name}".strip() or quote.policy.customer.user.username
+        created_by = f"{quote.created_by.first_name} {quote.created_by.last_name}".strip() if quote.created_by else ''
+        decided_by = f"{quote.decided_by.first_name} {quote.decided_by.last_name}".strip() if quote.decided_by else ''
+        ws.append([
+            quote.quote_id,
+            quote.policy.policy_number,
+            customer_name,
+            quote.policy.vehicle.vehicle_number,
+            float(quote.premium_amount),
+            float(quote.coverage_amount),
+            quote.currency,
+            quote.get_status_display(),
+            created_by,
+            quote.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            decided_by,
+            quote.customer_decision_at.strftime('%Y-%m-%d %H:%M:%S') if quote.customer_decision_at else '',
+        ])
+    
+    # Auto-size columns
+    for col in ws.columns:
+        max_length = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            try:
+                max_length = max(max_length, len(str(cell.value or '')))
+            except:
+                pass
+        ws.column_dimensions[col_letter].width = min(max_length + 2, 50)
+    
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    resp = HttpResponse(stream.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="quotations_export.xlsx"'
+    return resp
+
+@extend_schema(tags=['exports'], summary='Export claims to Excel')
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_claims_excel(request):
+    """Export all claims to Excel format"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return Response({'error': "Excel export requires 'openpyxl'"}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    
+    claims = Claim.objects.select_related('policy__customer', 'policy__vehicle', 'processed_by').all()
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Claims'
+    
+    headers = ['Claim ID', 'Policy Number', 'Customer', 'Vehicle Number', 
+               'Incident Date', 'Claim Date', 'Description', 'Estimated Amount', 
+               'Approved Amount', 'Status', 'Approval Status', 'Priority', 
+               'Processed By', 'Processed At', 'Requires Investigation']
+    ws.append(headers)
+    
+    # Style header
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    for claim in claims:
+        customer_name = f"{claim.policy.customer.user.first_name} {claim.policy.customer.user.last_name}".strip() or claim.policy.customer.user.username
+        processed_by = f"{claim.processed_by.first_name} {claim.processed_by.last_name}".strip() if claim.processed_by else ''
+        ws.append([
+            claim.claim_id,
+            claim.policy.policy_number,
+            customer_name,
+            claim.policy.vehicle.vehicle_number,
+            claim.incident_date.strftime('%Y-%m-%d'),
+            claim.claim_date.strftime('%Y-%m-%d %H:%M:%S'),
+            claim.description[:100] + '...' if len(claim.description) > 100 else claim.description,
+            float(claim.estimated_amount),
+            float(claim.approved_amount) if claim.approved_amount else '',
+            claim.get_status_display(),
+            claim.get_approval_status_display(),
+            claim.get_priority_display(),
+            processed_by,
+            claim.processed_at.strftime('%Y-%m-%d %H:%M:%S') if claim.processed_at else '',
+            'Yes' if claim.requires_investigation else 'No',
+        ])
+    
+    # Auto-size columns
+    for col in ws.columns:
+        max_length = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            try:
+                max_length = max(max_length, len(str(cell.value or '')))
+            except:
+                pass
+        ws.column_dimensions[col_letter].width = min(max_length + 2, 50)
+    
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    resp = HttpResponse(stream.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="claims_export.xlsx"'
+    return resp
+
+@extend_schema(tags=['exports'], summary='Export vehicles to Excel')
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_vehicles_excel(request):
+    """Export all vehicles to Excel format"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return Response({'error': "Excel export requires 'openpyxl'"}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    
+    vehicles = Vehicle.objects.select_related('customer', 'category').all()
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Vehicles'
+    
+    headers = ['Vehicle Number', 'Customer', 'Category', 'Make', 'Model', 
+               'Year', 'Engine Number', 'Chassis Number', 'Market Value', 
+               'Date Registered']
+    ws.append(headers)
+    
+    # Style header
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    for vehicle in vehicles:
+        customer_name = f"{vehicle.customer.user.first_name} {vehicle.customer.user.last_name}".strip() or vehicle.customer.user.username
+        ws.append([
+            vehicle.vehicle_number,
+            customer_name,
+            vehicle.category.get_name_display(),
+            vehicle.make,
+            vehicle.model,
+            vehicle.year,
+            vehicle.engine_number,
+            vehicle.chassis_number,
+            float(vehicle.market_value),
+            vehicle.date_registered.strftime('%Y-%m-%d %H:%M:%S'),
+        ])
+    
+    # Auto-size columns
+    for col in ws.columns:
+        max_length = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            try:
+                max_length = max(max_length, len(str(cell.value or '')))
+            except:
+                pass
+        ws.column_dimensions[col_letter].width = min(max_length + 2, 50)
+    
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    resp = HttpResponse(stream.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="vehicles_export.xlsx"'
+    return resp
+
+@extend_schema(tags=['exports'], summary='Export dashboard report to Excel')
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_dashboard_report_excel(request):
+    """Export dashboard summary report to Excel format"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return Response({'error': "Excel export requires 'openpyxl'"}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    
+    # Get summary data
+    total_policies = InsurancePolicy.objects.count()
+    active_policies = InsurancePolicy.objects.filter(status='active').count()
+    total_claims = Claim.objects.count()
+    pending_claims = Claim.objects.filter(status__in=['submitted', 'under_review']).count()
+    approved_claims = Claim.objects.filter(approval_status='approve').count()
+    total_payments = Payment.objects.count()
+    completed_payments = Payment.objects.filter(status='completed').count()
+    total_revenue = Payment.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    total_customers = Customer.objects.count()
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Dashboard Report'
+    
+    # Title
+    ws.merge_cells('A1:B1')
+    title_cell = ws['A1']
+    title_cell.value = 'Insurance Management System - Dashboard Report'
+    title_cell.font = Font(bold=True, size=16)
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    ws.append([])
+    ws.append(['Generated At', timezone.now().strftime('%Y-%m-%d %H:%M:%S')])
+    ws.append([])
+    
+    # Summary section
+    ws.append(['METRIC', 'VALUE'])
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    for cell in ws[4]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    summary_data = [
+        ['Total Policies', total_policies],
+        ['Active Policies', active_policies],
+        ['Total Claims', total_claims],
+        ['Pending Claims', pending_claims],
+        ['Approved Claims', approved_claims],
+        ['Total Payments', total_payments],
+        ['Completed Payments', completed_payments],
+        ['Total Revenue', f"${float(total_revenue):,.2f}"],
+        ['Total Customers', total_customers],
+    ]
+    
+    for row in summary_data:
+        ws.append(row)
+    
+    # Auto-size columns
+    for col in ws.columns:
+        max_length = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            try:
+                max_length = max(max_length, len(str(cell.value or '')))
+            except:
+                pass
+        ws.column_dimensions[col_letter].width = min(max_length + 2, 50)
+    
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    resp = HttpResponse(stream.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="dashboard_report.xlsx"'
+    return resp
+
 # Utility Views
 @extend_schema(tags=['utility'], summary='Health check')
 @api_view(['GET'])

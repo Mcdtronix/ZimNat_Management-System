@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { getAuthToken, apiFetch } from "@/lib/api";
+import { getAuthToken, apiFetch, exportVehicles } from "@/lib/api";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -131,6 +131,16 @@ export default function UnderwriterVehicles() {
   const [sortBy, setSortBy] = useState("latest");
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      await exportVehicles();
+      toast.success('Vehicles exported successfully');
+    } catch (error) {
+      console.error('Failed to export vehicles:', error);
+      toast.error('Failed to export vehicles. Please try again.');
+    }
+  };
 
   // Data fetching
   const { data: categories } = useQuery<VehicleCategory[]>({
@@ -755,11 +765,11 @@ export default function UnderwriterVehicles() {
                       <Plus className="w-4 h-4 mr-2" />
                       Add New Vehicle
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button variant="outline" className="w-full justify-start" onClick={handleExport}>
                       <Download className="w-4 h-4 mr-2" />
                       Export Vehicle Data
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button variant="outline" className="w-full justify-start" onClick={handleExport}>
                       <FileText className="w-4 h-4 mr-2" />
                       Generate Report
                     </Button>

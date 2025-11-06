@@ -28,6 +28,12 @@ from .views import (
     analytics_overview,
     generate_quote,
     generate_report,
+    export_policies_excel,
+    export_payments_excel,
+    export_quotations_excel,
+    export_claims_excel,
+    export_vehicles_excel,
+    export_dashboard_report_excel,
     health_check,
     user_permissions,
     update_claim_status,
@@ -84,6 +90,14 @@ urlpatterns = [
     path('api/analytics/overview/', analytics_overview, name='analytics_overview'),
     path('api/generate-quote/', generate_quote, name='generate_quote'),
     path('api/generate-report/', generate_report, name='generate_report'),
+    
+    # Excel Export endpoints
+    path('api/export/policies/', export_policies_excel, name='export_policies_excel'),
+    path('api/export/payments/', export_payments_excel, name='export_payments_excel'),
+    path('api/export/quotations/', export_quotations_excel, name='export_quotations_excel'),
+    path('api/export/claims/', export_claims_excel, name='export_claims_excel'),
+    path('api/export/vehicles/', export_vehicles_excel, name='export_vehicles_excel'),
+    path('api/export/dashboard/', export_dashboard_report_excel, name='export_dashboard_report_excel'),
 
     # Profile
     path('api/profile/user/', UserProfileView.as_view(), name='user_profile'),

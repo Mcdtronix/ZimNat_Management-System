@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getAuthToken, apiFetch } from "@/lib/api";
+import { getAuthToken, apiFetch, exportDashboardReport } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -160,6 +160,15 @@ export default function UnderwriterDashboard() {
   const pendingClaims = kpis.data?.pending_claims || 0;
   const approvalRate = totalClaims > 0 ? ((totalClaims - pendingClaims) / totalClaims * 100).toFixed(1) : "0";
 
+  const handleExportReport = async () => {
+    try {
+      await exportDashboardReport();
+    } catch (error) {
+      console.error('Failed to export report:', error);
+      alert('Failed to export report. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <div className="p-6 space-y-6">
@@ -170,7 +179,7 @@ export default function UnderwriterDashboard() {
             <p className="text-slate-600 mt-1">Comprehensive analytics and management overview</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExportReport}>
               <Download className="w-4 h-4 mr-2" />
               Export Report
             </Button>

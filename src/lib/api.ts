@@ -256,3 +256,66 @@ export function processClaim(claimId: number, data: {
 export function getClaimApprovalHistory(claimId: number) {
   return apiFetch(`/api/claims/${claimId}/approval_history/`);
 }
+
+// Excel Export functions
+export async function exportToExcel(exportType: 'policies' | 'payments' | 'quotations' | 'claims' | 'vehicles' | 'dashboard') {
+  const token = getAuthToken();
+  const url = `${API_BASE}/api/export/${exportType}/`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': token ? `Bearer ${token}` : '',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Export failed: ${response.statusText}`);
+  }
+
+  // Get filename from Content-Disposition header or use default
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `${exportType}_export.xlsx`;
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+    if (filenameMatch) {
+      filename = filenameMatch[1];
+    }
+  }
+
+  // Create blob and download
+  const blob = await response.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
+}
+
+// Convenience functions for each export type
+export function exportPolicies() {
+  return exportToExcel('policies');
+}
+
+export function exportPayments() {
+  return exportToExcel('payments');
+}
+
+export function exportQuotations() {
+  return exportToExcel('quotations');
+}
+
+export function exportClaims() {
+  return exportToExcel('claims');
+}
+
+export function exportVehicles() {
+  return exportToExcel('vehicles');
+}
+
+export function exportDashboardReport() {
+  return exportToExcel('dashboard');
+}

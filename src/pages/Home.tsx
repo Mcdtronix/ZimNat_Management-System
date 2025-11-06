@@ -23,11 +23,11 @@ const Home = () => {
                   Get Started
                 </Button>
               </Link>
-              <Link to="/underwriter">
+              {/* <Link to="/underwriter">
                 <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-slate-800">
                   Staff Login
                 </Button>
-              </Link>
+              </Link> */}
             </div>
           </div>
         </div>
